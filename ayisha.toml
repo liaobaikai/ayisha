@@ -1,0 +1,172 @@
+[server]
+#-----------------------------------------------------------------------------
+# Name          : id
+# Datatype      : Number
+# Description   : Specify the number of server to be created
+# Valid values  : 0 to 4294967295
+# Default value : 1
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+server_id = 123
+
+#-----------------------------------------------------------------------------
+# Name          : port
+# Datatype      : Number
+# Description   : server port
+# Valid values  : 1000 to 65535
+# Default value : 2025
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+port = 6969
+
+data_root = "./ayisha/defaults/123"
+# worker = 2
+namespace = "oracle2kafka-01"
+
+sqlite = "./.ayisha/defaults/123/ayisha.db"
+
+#-----------------------------------------------------------------------------
+# Name          : weight
+# Datatype      : Number
+# Description   : Specify the number of weight to be created
+# Valid values  : 0 to 4294967295
+# Default value : 1
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+weight = 123
+
+
+##############################################################################
+[client]
+#-----------------------------------------------------------------------------
+# Name          : singleton
+# Datatype      : bool
+# Description   : Specify the true/false of singleton to be created
+# Valid values  : false/true
+# Default value : false
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+singleton = false
+
+#-----------------------------------------------------------------------------
+# Name          : app_key
+# Datatype      : String
+# Description   : Specify the key of app to be created
+# Valid values  : String
+# Default value : 
+# Mandatory     : YES
+#-----------------------------------------------------------------------------
+app_key = "96184f79-241c-4915-b9a5-c49dab99ca03"
+
+#-----------------------------------------------------------------------------
+# Name          : app_secret
+# Datatype      : String
+# Description   : Specify the key of app to be created
+# Valid values  : String
+# Default value : 
+# Mandatory     : YES
+#-----------------------------------------------------------------------------
+app_secret = "2dfbded6-a017-494f-9d39-b4a677a9a663"
+
+# 连接失败重试等待时间
+connect_retry = 10
+
+namespace = "oracle2kafka-01"
+
+
+##############################################################################
+[heartbeat]
+interval = 10
+timeout = 30
+
+
+##############################################################################
+[[node]]
+#-----------------------------------------------------------------------------
+# Name          : id
+# Datatype      : Number
+# Description   : Specify the number of server to be created
+# Valid values  : 0 to 4294967295
+# Default value : 1
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+id = 123
+
+#-----------------------------------------------------------------------------
+# Name          : port
+# Datatype      : Number
+# Description   : server port
+# Valid values  : 1000 to 65535
+# Default value : 2025
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+port = 6969
+
+#-----------------------------------------------------------------------------
+# Name          : host
+# Datatype      : String
+# Description   : hostname, ip or domain.
+# Default value : None
+# Mandatory     : Yes
+#-----------------------------------------------------------------------------
+host = "127.0.0.1"
+
+[[node]]
+#-----------------------------------------------------------------------------
+# Name          : id
+# Datatype      : Number
+# Description   : Specify the number of server to be created
+# Valid values  : 0 to 4294967295
+# Default value : 1
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+id = 124
+
+#-----------------------------------------------------------------------------
+# Name          : port
+# Datatype      : Number
+# Description   : server port
+# Valid values  : 1000 to 65535
+# Default value : 2025
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+port = 6970
+
+#-----------------------------------------------------------------------------
+# Name          : host
+# Datatype      : String
+# Description   : hostname, ip or domain.
+# Default value : None
+# Mandatory     : Yes
+#-----------------------------------------------------------------------------
+host = "127.0.0.1"
+
+[[node]]
+#-----------------------------------------------------------------------------
+# Name          : id
+# Datatype      : Number
+# Description   : Specify the number of server to be created
+# Valid values  : 0 to 4294967295
+# Default value : 1
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+id = 125
+
+#-----------------------------------------------------------------------------
+# Name          : port
+# Datatype      : Number
+# Description   : server port
+# Valid values  : 1000 to 65535
+# Default value : 2025
+# Mandatory     : No
+#-----------------------------------------------------------------------------
+port = 6971
+
+#-----------------------------------------------------------------------------
+# Name          : host
+# Datatype      : String
+# Description   : hostname, ip or domain.
+# Default value : None
+# Mandatory     : Yes
+#-----------------------------------------------------------------------------
+host = "127.0.0.1"

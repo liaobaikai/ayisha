@@ -1,0 +1,344 @@
+07 05 09:50:22  INFO actix_server::builde: starting 2 workers
+07 05 09:50:22  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:13:34  INFO actix_server::builde: starting 2 workers
+07 06 21:13:34  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:14:48  INFO actix_server::builde: starting 2 workers
+07 06 21:14:48  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:18:43  INFO actix_server::builde: starting 2 workers
+07 06 21:18:43  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:27:08  INFO actix_server::builde: starting 2 workers
+07 06 21:27:08  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:42:33  INFO actix_server::builde: starting 2 workers
+07 06 21:42:33  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:48:04  INFO actix_server::builde: starting 2 workers
+07 06 21:48:04  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:54:20  INFO actix_server::builde: starting 2 workers
+07 06 21:54:20  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 21:59:10  INFO actix_server::builde: starting 2 workers
+07 06 21:59:10  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 22:25:55  INFO actix_server::builde: starting 2 workers
+07 06 22:25:55  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 22:26:23  INFO actix_server::builde: starting 2 workers
+07 06 22:26:23  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 22:33:03  INFO actix_server::builde: starting 2 workers
+07 06 22:33:03  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 23:36:27  INFO actix_server::builde: starting 2 workers
+07 06 23:36:27  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 23:37:11  INFO actix_server::builde: starting 2 workers
+07 06 23:37:11  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 06 23:53:26  INFO actix_server::builde: starting 2 workers
+07 06 23:53:26  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 10:05:29  INFO actix_server::builde: starting 2 workers
+07 07 10:05:29  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 10:25:12  INFO actix_server::builde: starting 2 workers
+07 07 10:25:12  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 11:10:47  INFO actix_server::builde: starting 2 workers
+07 07 11:10:47  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 11:11:20  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 07 11:11:20 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6969
+07 07 11:11:20  INFO actix_server::accept: accept thread stopped
+07 07 11:11:20  INFO actix_server::worker: shutting down idle worker
+07 07 11:11:20  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 07 12:03:17  INFO actix_server::builde: starting 2 workers
+07 07 12:03:17  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 12:04:01  INFO actix_server::builde: starting 2 workers
+07 07 12:04:01  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 12:21:02  INFO actix_server::builde: starting 2 workers
+07 07 12:21:02  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 12:26:58  INFO actix_server::builde: starting 2 workers
+07 07 12:26:58  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 12:27:04  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 07 12:27:04  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 07 12:27:04  INFO actix_server::worker: shutting down idle worker
+07 07 12:27:04 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6969
+07 07 12:27:04  INFO actix_server::accept: accept thread stopped
+07 07 17:15:00  INFO actix_server::builde: starting 2 workers
+07 07 17:15:00  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 17:15:58  INFO actix_server::builde: starting 2 workers
+07 07 17:15:58  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 17:18:35  INFO actix_server::builde: starting 2 workers
+07 07 17:18:35  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 17:20:07  INFO actix_server::builde: starting 2 workers
+07 07 17:20:07  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 17:21:03  INFO actix_server::builde: starting 2 workers
+07 07 17:21:03  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 19:08:41  INFO actix_server::builde: starting 2 workers
+07 07 19:08:41  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 19:23:05  INFO actix_server::builde: starting 2 workers
+07 07 19:23:05  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:22:50  INFO actix_server::builde: starting 2 workers
+07 07 21:22:50  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:23:38  INFO actix_server::builde: starting 2 workers
+07 07 21:23:38  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:27:23  INFO actix_server::builde: starting 2 workers
+07 07 21:27:23  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:28:07  INFO actix_server::builde: starting 2 workers
+07 07 21:28:07  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:29:24  INFO actix_server::builde: starting 2 workers
+07 07 21:29:24  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:30:51  INFO actix_server::builde: starting 2 workers
+07 07 21:30:51  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:32:06  INFO actix_server::builde: starting 2 workers
+07 07 21:32:06  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:46:31  INFO actix_server::builde: starting 2 workers
+07 07 21:46:31  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:49:06  INFO actix_server::builde: starting 2 workers
+07 07 21:49:06  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:54:28  INFO actix_server::builde: starting 2 workers
+07 07 21:54:28  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:55:28  INFO actix_server::builde: starting 2 workers
+07 07 21:55:28  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:56:27  INFO actix_server::builde: starting 2 workers
+07 07 21:56:27  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:57:30  INFO actix_server::builde: starting 2 workers
+07 07 21:57:30  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 21:59:04  INFO actix_server::builde: starting 2 workers
+07 07 21:59:04  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 22:00:03  INFO actix_server::builde: starting 2 workers
+07 07 22:00:03  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 22:08:15  INFO actix_server::builde: starting 2 workers
+07 07 22:08:15  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 22:08:58  INFO actix_server::builde: starting 2 workers
+07 07 22:08:58  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 23:03:22  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 07 23:03:22 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6969
+07 07 23:03:22  INFO actix_server::accept: accept thread stopped
+07 07 23:03:22  INFO actix_server::worker: shutting down idle worker
+07 07 23:03:22  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 07 23:06:09  INFO actix_server::builde: starting 2 workers
+07 07 23:06:09  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 23:10:07  INFO actix_server::builde: starting 2 workers
+07 07 23:10:07  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 23:10:57  INFO actix_server::builde: starting 2 workers
+07 07 23:10:57  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 23:11:11  INFO actix_server::builde: starting 2 workers
+07 07 23:11:11  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 07 23:12:35  INFO actix_server::builde: starting 2 workers
+07 07 23:12:35  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:02:03  INFO actix_server::builde: starting 2 workers
+07 08 09:02:03  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:04:06  INFO actix_server::builde: starting 2 workers
+07 08 09:04:06  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:08:17  INFO actix_server::builde: starting 2 workers
+07 08 09:08:17  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:09:21  INFO actix_server::builde: starting 2 workers
+07 08 09:09:21  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:10:13  INFO actix_server::builde: starting 2 workers
+07 08 09:10:13  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:25:07  INFO actix_server::builde: starting 2 workers
+07 08 09:25:07  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:52:19  INFO actix_server::builde: starting 2 workers
+07 08 09:52:19  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:53:43  INFO actix_server::builde: starting 2 workers
+07 08 09:53:43  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 09:56:05  INFO actix_server::builde: starting 2 workers
+07 08 09:56:05  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 10:01:57  INFO actix_server::builde: starting 2 workers
+07 08 10:01:57  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 10:05:26  INFO actix_server::builde: starting 2 workers
+07 08 10:05:26  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:12:44  INFO actix_server::builde: starting 2 workers
+07 08 11:12:44  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:16:45  INFO actix_server::builde: starting 2 workers
+07 08 11:16:45  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:17:45  INFO actix_server::builde: starting 2 workers
+07 08 11:17:45  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:19:49  INFO actix_server::builde: starting 2 workers
+07 08 11:19:49  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:23:29  INFO actix_server::builde: starting 2 workers
+07 08 11:23:29  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:24:13  INFO actix_server::builde: starting 2 workers
+07 08 11:24:13  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:27:12  INFO actix_server::builde: starting 2 workers
+07 08 11:27:12  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:31:00  INFO actix_server::builde: starting 2 workers
+07 08 11:31:00  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 11:37:39  INFO actix_server::builde: starting 2 workers
+07 08 11:38:08  INFO actix_server::builde: starting 2 workers
+07 08 11:38:08  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 14:13:21  INFO actix_server::builde: starting 2 workers
+07 08 14:13:21  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 14:14:32  INFO actix_server::builde: starting 2 workers
+07 08 14:14:32  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 14:16:01  INFO actix_server::builde: starting 2 workers
+07 08 14:16:01  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 14:17:59  INFO actix_server::builde: starting 2 workers
+07 08 14:18:00  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 14:23:15  INFO actix_server::builde: starting 2 workers
+07 08 14:23:15  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 14:25:44  INFO actix_server::builde: starting 2 workers
+07 08 14:25:44  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:15:21  INFO actix_server::builde: starting 2 workers
+07 08 22:15:21  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:15:51  INFO actix_server::builde: starting 2 workers
+07 08 22:15:51  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:19:10  INFO actix_server::builde: starting 2 workers
+07 08 22:19:10  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:31:02  INFO actix_server::builde: starting 2 workers
+07 08 22:31:02  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:35:07  INFO actix_server::builde: starting 2 workers
+07 08 22:35:07  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:38:19  INFO actix_server::builde: starting 2 workers
+07 08 22:38:19  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:43:48  INFO actix_server::builde: starting 2 workers
+07 08 22:43:48  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:45:06  INFO actix_server::builde: starting 2 workers
+07 08 22:45:06  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 08 22:50:27  INFO actix_server::builde: starting 2 workers
+07 08 22:50:27  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 09:45:40  INFO actix_server::builde: starting 2 workers
+07 09 09:45:40  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 09:46:40  INFO actix_server::builde: starting 2 workers
+07 09 09:46:40  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 09:50:30  INFO actix_server::builde: starting 2 workers
+07 09 09:50:30  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 13:55:45  INFO actix_server::builde: starting 2 workers
+07 09 13:55:45  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 15:24:41  INFO actix_server::builde: starting 2 workers
+07 09 15:24:41  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 15:26:20  INFO actix_server::builde: starting 2 workers
+07 09 15:26:20  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 09 15:54:24  INFO actix_server::builde: starting 2 workers
+07 09 15:54:24  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:07:13  INFO actix_server::builde: starting 2 workers
+07 10 22:07:13  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:11:00  INFO actix_server::builde: starting 2 workers
+07 10 22:11:00  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:11:24  INFO actix_server::builde: starting 2 workers
+07 10 22:11:24  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:13:17  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:13:17  INFO actix_server::worker: shutting down idle worker
+07 10 22:13:17 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:2026
+07 10 22:13:17  INFO actix_server::accept: accept thread stopped
+07 10 22:13:17  INFO actix_server::worker: shutting down idle worker
+07 10 22:15:00  INFO actix_server::builde: starting 2 workers
+07 10 22:15:00  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:15:07  INFO actix_server::builde: starting 2 workers
+07 10 22:15:07  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:15:36  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:15:36  INFO actix_server::worker: shutting down idle worker
+07 10 22:15:36 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:2026
+07 10 22:15:36  INFO actix_server::worker: shutting down idle worker
+07 10 22:15:36  INFO actix_server::accept: accept thread stopped
+07 10 22:16:34  INFO actix_server::builde: starting 2 workers
+07 10 22:16:34  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:16:40  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:16:40  INFO actix_server::worker: shutting down idle worker
+07 10 22:16:40  INFO actix_server::worker: shutting down idle worker
+07 10 22:16:40 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:2026
+07 10 22:16:40  INFO actix_server::accept: accept thread stopped
+07 10 22:17:11  INFO actix_server::builde: starting 2 workers
+07 10 22:17:11  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:19:46  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:19:46  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:19:46 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:2026
+07 10 22:19:46  INFO actix_server::worker: shutting down idle worker
+07 10 22:19:46  INFO actix_server::accept: accept thread stopped
+07 10 22:20:16  INFO actix_server::builde: starting 2 workers
+07 10 22:20:16  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:20:22  INFO actix_server::builde: starting 2 workers
+07 10 22:20:22  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:24:55  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:24:55  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:24:55 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:2026
+07 10 22:24:55  INFO actix_server::accept: accept thread stopped
+07 10 22:24:55  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:27:35  INFO actix_server::builde: starting 2 workers
+07 10 22:27:35  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:27:39  INFO actix_server::builde: starting 2 workers
+07 10 22:27:39  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:31:05  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:31:05 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:31:05  INFO actix_server::accept: accept thread stopped
+07 10 22:31:05  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:31:05  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:31:28  INFO actix_server::builde: starting 2 workers
+07 10 22:31:28  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:31:30  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:31:30  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:31:30  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:31:30 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:31:30  INFO actix_server::accept: accept thread stopped
+07 10 22:31:38  INFO actix_server::builde: starting 2 workers
+07 10 22:31:38  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:32:06  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:32:06  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:32:06 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:32:06  INFO actix_server::accept: accept thread stopped
+07 10 22:32:06  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:32:18  INFO actix_server::builde: starting 2 workers
+07 10 22:32:18  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:32:26  INFO actix_server::builde: starting 2 workers
+07 10 22:32:26  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:32:54  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:32:54  INFO actix_server::worker: shutting down idle worker
+07 10 22:32:54 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:32:54  INFO actix_server::worker: shutting down idle worker
+07 10 22:32:54  INFO actix_server::accept: accept thread stopped
+07 10 22:32:57  INFO actix_server::builde: starting 2 workers
+07 10 22:32:57  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:33:13  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:33:13 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:33:13  INFO actix_server::accept: accept thread stopped
+07 10 22:33:13  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:33:13  INFO actix_server::worker: force shutdown worker, closing 2 connections
+07 10 22:33:15  INFO actix_server::builde: starting 2 workers
+07 10 22:33:15  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:33:41  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:33:41  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:33:41  INFO actix_server::worker: force shutdown worker, closing 2 connections
+07 10 22:33:41 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6971
+07 10 22:33:41  INFO actix_server::accept: accept thread stopped
+07 10 22:33:44  INFO actix_server::builde: starting 2 workers
+07 10 22:33:44  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:34:07  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:34:07  INFO actix_server::worker: force shutdown worker, closing 2 connections
+07 10 22:34:07 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6971
+07 10 22:34:07  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:34:07  INFO actix_server::accept: accept thread stopped
+07 10 22:34:09  INFO actix_server::builde: starting 2 workers
+07 10 22:34:09  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:34:38  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:34:38  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:34:38  INFO actix_server::worker: force shutdown worker, closing 2 connections
+07 10 22:34:38 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:34:38  INFO actix_server::accept: accept thread stopped
+07 10 22:35:08  INFO actix_server::builde: starting 2 workers
+07 10 22:35:08  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:35:11  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:35:11 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6971
+07 10 22:35:11  INFO actix_server::accept: accept thread stopped
+07 10 22:35:11  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:35:11  INFO actix_server::worker: force shutdown worker, closing 2 connections
+07 10 22:35:37  INFO actix_server::builde: starting 2 workers
+07 10 22:35:37  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:36:43  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:36:43 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6971
+07 10 22:36:43  INFO actix_server::accept: accept thread stopped
+07 10 22:36:43  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:36:43  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:36:45  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:36:45 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:36:45  INFO actix_server::accept: accept thread stopped
+07 10 22:36:45  INFO actix_server::worker: shutting down idle worker
+07 10 22:36:45  INFO actix_server::worker: shutting down idle worker
+07 10 22:37:11  INFO actix_server::builde: starting 2 workers
+07 10 22:37:11  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:37:15  INFO actix_server::builde: starting 2 workers
+07 10 22:37:15  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:37:18  INFO actix_server::builde: starting 2 workers
+07 10 22:37:18  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 10 22:45:29  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 10 22:45:29 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6970
+07 10 22:45:29  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 10 22:45:29  INFO actix_server::worker: force shutdown worker, closing 2 connections
+07 10 22:45:29  INFO actix_server::accept: accept thread stopped
+07 13 12:33:00  INFO actix_server::server: SIGINT received; starting forced shutdown
+07 13 12:33:00  INFO actix_server::worker: force shutdown worker, closing 1 connections
+07 13 12:33:00  INFO actix_server::worker: shutting down idle worker
+07 13 12:33:00 DEBUG actix_server::accept: paused accepting connections on 0.0.0.0:6971
+07 13 12:33:00  INFO actix_server::accept: accept thread stopped
+07 13 12:33:20  INFO actix_server::builde: starting 2 workers
+07 13 12:33:20  INFO actix_server::server: Actix runtime found; starting in Actix runtime
+07 14 21:27:18  INFO actix_server::builde: starting 2 workers
+07 14 21:27:18  INFO actix_server::server: Actix runtime found; starting in Actix runtime
