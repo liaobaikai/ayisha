@@ -5,6 +5,7 @@ use actix_web::{ middleware::Logger, web, App, HttpServer
 };
 use parking_lot::{Condvar, Mutex};
 use pom::PoManager;
+use shared::ShareGlobalArea;
 // use db::Node;
 
 mod server;
@@ -16,7 +17,7 @@ mod vot;
 mod config;
 mod ws;
 mod pom;
-
+mod shared;
 
 
 
@@ -26,47 +27,61 @@ async fn main() -> std::io::Result<()> {
 
     // let pair = Arc::new((Mutex::new(false), Condvar::new()));
     // let data1 = server::GLOBAL_STATE_DATA.clone();
-    let pair2 = server::GLOBAL_STATE_MUTEX_PAIR.clone();
+    let mut sga = ShareGlobalArea::new();
+    let mut flag = false;
+
+    let pair2 = shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
     thread::spawn(move|| {
         let &(ref lock, ref cvar) = &*pair2;
         println!("inner waiting lock");
-        let mut state = lock.lock();
+        let mut data = lock.lock();
         println!("inner acquire lock");
-        state.lock = true;
-        state.poll += 1;
-        //*started = true;
-        state.lock = false;
+        println!("inner data.poll=>{}", data.poll);
+        sga.poll = 1;
+        // 修改数据
+        *data = sga;
+        let mut started = data.lock.lock();
+        *started = true;
+
         cvar.notify_one();
         println!("cvar.notify_one");
     });
     // 
     {
         println!("wait for the thread to start up");
-        let &(ref lock, ref cvar) = &*server::GLOBAL_STATE_MUTEX_PAIR.clone();
+        let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         println!("outer waiting lock");
-        let mut state = lock.lock();
+        let mut data = lock.lock();
         println!("outer acquire lock");
-        
-        if !state.lock {
+        // 修改数据
+        let mut sga2 = sga.clone();
+        sga2.poll += 200;
+        *data = sga2;
+
+        let started = data.lock.lock();
+
+        // 不符合条件，则等待
+        while !*started {
             println!("cvar wait");
-            cvar.wait(&mut state);
-            println!("data.poll=>{}", state.poll);
+            cvar.wait(&mut data);
+            println!("data.poll=>{}", data.poll);
         }
+        
     }
 
-    thread::sleep(Duration::from_secs(10));
+    // thread::sleep(Duration::from_secs(10));
 
-    let pair3 = server::GLOBAL_STATE_MUTEX_PAIR.clone();
-    thread::spawn(move|| {
-        let &(ref lock, ref cvar) = &*pair3;
-        println!("inner2 waiting lock");
-        let mut state = lock.lock();
-        println!("inner2 acquire lock");
-        state.poll += 2;
-        state.lock = true;
-        cvar.notify_one();
-        println!("inner2 cvar.notify_one...");
-    });
+    // let pair3 = shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
+    // thread::spawn(move|| {
+    //     let &(ref lock, ref cvar) = &*pair3;
+    //     println!("inner2 waiting lock");
+    //     let mut state = lock.lock();
+    //     println!("inner2 acquire lock");
+    //     state.poll += 2;
+    //     state.lock = true;
+    //     cvar.notify_one();
+    //     println!("inner2 cvar.notify_one...");
+    // });
 
 
     // exit(0);
