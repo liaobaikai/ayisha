@@ -19,11 +19,14 @@ server_id = 124
 #-----------------------------------------------------------------------------
 port = 6970
 
-data_root = "./ayisha/defaults/124"
+# data_root = "./ayisha/"
 # worker = 2
-namespace = "oracle2kafka-01"
+namespaces = [
+    "default",
+    "buildin",
+]
 
-sqlite = "./.ayisha/defaults/124/ayisha.db"
+# sqlite = "./.ayisha/defaults/123/ayisha.db"
 
 #-----------------------------------------------------------------------------
 # Name          : weight
@@ -56,7 +59,7 @@ singleton = false
 # Default value : 
 # Mandatory     : YES
 #-----------------------------------------------------------------------------
-app_key = "96184f79-241c-4915-b9a5-c49dab99ca03"
+app_key = "10f357e5-100b-4639-a93c-3863845fdb08"
 
 #-----------------------------------------------------------------------------
 # Name          : app_secret
@@ -66,12 +69,12 @@ app_key = "96184f79-241c-4915-b9a5-c49dab99ca03"
 # Default value : 
 # Mandatory     : YES
 #-----------------------------------------------------------------------------
-app_secret = "2dfbded6-a017-494f-9d39-b4a677a9a663"
+app_secret = "fadf8748-35ac-4193-baea-4b5fd2edd722"
 
 # 连接失败重试等待时间
 connect_retry = 10
 
-namespace = "oracle2kafka-01"
+namespace = "default"
 
 
 ##############################################################################

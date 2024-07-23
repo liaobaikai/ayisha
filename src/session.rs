@@ -2,10 +2,8 @@ use std::{net::IpAddr, time::{Duration, Instant}};
 
 use actix::prelude::*;
 use actix_web_actors::ws;
-use serde::de::value;
-use serde_json::{Number, Value};
 
-use crate::{db::Node, server::{self}, ws::{WsDataStatus, WsEvent, WsRequest, WsResponse}};
+use crate::{server::{self}, ws::{WsEvent, WsRequest, WsResponse}};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -21,7 +19,9 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 #[derive(Debug)]
 pub struct WsChatSession {
 
-    pub id: usize,
+    pub server_id: usize,
+    // 
+    pub voter_id: usize,
 
     /// unique session id
     pub session_id: usize,
@@ -62,14 +62,11 @@ impl WsChatSession {
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 act.closed = true;
 
-                log::info!(
-                    "{} - - Client has not sent heartbeat in over {CLIENT_TIMEOUT:?}; disconnecting", act.ip
-                );
-                // heartbeat timed out
-                // log::info!("{} - - Session {} disconnect, heartbeat timed out", act.ip, act.sid);
-
                 // notify chat server
                 act.addr.do_send(server::Disconnect { id: act.session_id, closed: act.closed, ip: act.ip });
+
+                // heartbeat timed out
+                log::info!("[{}] - [{}] - The session has been aborted due to heartbeat timed out {:?}", act.server_id, act.voter_id, CLIENT_TIMEOUT);
 
                 // stop actor
                 ctx.stop();
@@ -81,7 +78,7 @@ impl WsChatSession {
             ctx.ping(b"");
         });
 
-        log::info!("{} - - Started session {} heartbeat timer", self.ip, self.id);
+        log::debug!("[{}] - [{}] - Session Heartbeat Timer started", self.server_id, self.voter_id);
     }
 }
 
@@ -92,7 +89,7 @@ impl Actor for WsChatSession {
     /// We register ws session with ChatServer
     fn started(&mut self, ctx: &mut Self::Context) {
         // we'll start heartbeat process on session start.
-        log::info!("{} - - Created session {}", self.ip, self.id);
+        
         self.hb(ctx);
 
         // register self in chat server. `AsyncContext::wait` register
@@ -103,9 +100,12 @@ impl Actor for WsChatSession {
         let addr = ctx.address();
         self.addr
             .send(server::Connect {
-                id: self.id,
+                server_id: self.server_id,
+                voter_id: self.voter_id,
                 addr: addr.recipient(),
-                ip: self.ip
+                ip: self.ip,
+                namespace: self.namespace.clone(),
+
             })
             .into_actor(self)
             .then(|res, act, ctx| {
@@ -117,6 +117,9 @@ impl Actor for WsChatSession {
                 fut::ready(())
             })
             .wait(ctx);
+
+        log::debug!("[{}] - [{}] - Session started", self.server_id, self.voter_id);
+            
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
@@ -199,7 +202,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                         // });
                         let data = server::Join {
                             session_id: self.session_id,
-                            attr: v.attr.clone()
+                            state: v.state.clone()
                         };
 
                         // 同步发送消息并响应
@@ -216,7 +219,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                                 // } else {
                                 //     data.status = WsDataStatus::YES;
                                 // }
-                                ctx.text(WsResponse::success(v.event, "Joined".to_owned(), Some(join.attr)).to_string());
+                                ctx.text(WsResponse::ok(v.event, "Joined".to_owned(), Some(join.state)).to_string());
                             } else {
                                 println!("Something is wrong")
                             }
@@ -233,31 +236,51 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                         // 不等待响应
                         self.addr.do_send(server::Copy {
                             session_id: self.session_id,
-                            attr: v.attr.clone()
+                            state: v.state.clone()
                         });
 
-                        ctx.text(WsResponse::success(v.event, "Copy".to_owned(), Some(v.attr)).to_string());
+                        ctx.text(WsResponse::ok(v.event, "Copy".to_owned(), Some(v.state)).to_string());
 
                     }
 
-                    WsEvent::ELECTION => {
+                    WsEvent::VOTE => {
                         // 数据同步，一般加入到集群中下一步就是数据同步了
                         // 将数据同步到其他会话
 
                         // 加入到集群中
                         // 不等待响应
-                        self.addr.do_send(server::Election {
-                            session_id: self.session_id,
-                            attr: v.attr.clone()
-                        });
+                        // self.addr.do_send(server::Vote {
+                        //     session_id: self.session_id,
+                        //     state: v.state.clone()
+                        // });
 
-                        ctx.text(WsResponse::success(v.event, "Election".to_owned(), Some(v.attr)).to_string());
+                        // ctx.text(WsResponse::success(v.event, "Election".to_owned(), Some(v.state)).to_string());
+                        let data = server::Vote {
+                            session_id: self.session_id,
+                            state: v.state.clone(),
+                            ok: false
+                        };
+                        self.addr.send(data).into_actor(self).then(move |res, _, ctx| {
+                            if let Ok(vote) = res {
+                                let state = Some(vote.state.clone());
+                                if vote.ok {
+                                    // 投票成功
+                                    ctx.text(WsResponse::ok(v.event, "Voted".to_owned(), state).to_string());
+                                } else {
+                                    // 投票失败，票数转移给其他候选人
+                                    ctx.text(WsResponse::failed(v.event, "Changed Vote".to_owned(), state).to_string());
+                                }
+                            } else {
+                                println!("Something is wrong")
+                            }
+                            fut::ready(())
+                        }).wait(ctx);
 
                     }
 
                     _ => {
                         // 未适配的类型
-                        ctx.text(WsResponse::failed(v.event, "Unsupported event".to_owned(), Some(v.attr)).to_string());
+                        ctx.text(WsResponse::failed(v.event, "Unsupported event".to_owned(), Some(v.state)).to_string());
                         return;
                     }
                 }

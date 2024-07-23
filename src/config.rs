@@ -1,5 +1,6 @@
-use std::fs;
-use std::path::Path;
+use std::collections::HashMap;
+use std::{env, fs};
+use std::path::{Path, PathBuf};
 use std::{fs::File, io};
 use std::io::Error;
 
@@ -36,9 +37,9 @@ pub struct AppConfigServer {
     // 启动线程数：默认为2   
     pub worker: Option<usize>,       
     // 命名空间：默认为 defaults
-    pub namespace: Option<String>,
+    pub namespaces: Option<Vec<String>>,
     // 默认数据库：默认为 ./${id}/app.db
-    pub sqlite: Option<String>,                     
+    // pub sqlite: Option<String>,                     
     // 权重：默认为1
     pub weight: Option<usize>,
     // 数据文件目录
@@ -84,6 +85,53 @@ pub struct AppConfigNode {
     pub port: Option<u16>
 }
 
+/// Host Based Authorization - Ident
+#[derive(Debug, Clone, Deserialize)]
+pub struct HostBasedAuth {
+    pub map: HashMap<String, Vec<Ident>>,
+    
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Ident {
+    pub user: String,
+    pub app_key: String,
+    pub app_secret: String,
+    pub namespace: String,
+}
+
+impl HostBasedAuth {
+    
+    pub fn new() -> Self {
+
+        let path = "/Users/lbk/ayisha/hba_ident.toml";
+
+        let toml_text = fs::read_to_string(path).unwrap();
+        let hba: HostBasedAuth = match toml::from_str(&toml_text) {
+            Ok(p) => p,
+            Err(e) => {
+                panic!("<ParseTOML> File {} cannot be parsed, CAUSE:\n{}", path, e);
+            }
+        };
+        hba
+    }
+
+    pub fn match_ident(&self, app_key: &str, app_secret: &str) -> HashMap<String, Ident> {
+
+        let mut ret = HashMap::new();
+
+        for (host, idents) in self.map.iter() {
+            for ident in idents {
+                if ident.app_key.eq_ignore_ascii_case(app_key) && ident.app_secret.eq_ignore_ascii_case(app_secret) {
+                    ret.insert(host.to_owned(), ident.to_owned());
+                }
+            }
+        }
+
+        ret
+    }
+}
+
 
 #[derive(Debug, StructOpt)]
 pub struct Opt {
@@ -109,23 +157,37 @@ pub fn get_server_worker() -> usize {
     APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.worker }).unwrap_or(2)
 }
 
-pub fn get_server_namespace() -> String {
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.namespace }).unwrap_or(String::from("defaults"))
+pub fn get_server_namespaces() -> Vec<String> {
+    let mut default = Vec::new();
+    default.push(String::from("default"));
+    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.namespaces }).unwrap_or(default)
 }
 
-pub fn get_server_sqlite() -> String {
-    let path = APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.sqlite }).unwrap_or(format!("{}/{}/ayisha.db", get_server_data_root(), get_server_id()));
-    let parent = Path::new(&path).parent().unwrap();
-    let _ = fs::create_dir_all(parent).unwrap();
-    path
-}
+// pub fn get_server_sqlite() -> String {
+//     let path = APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.sqlite }).unwrap_or(format!("{}/{}/ayisha.db", get_server_data_root(), get_server_id()));
+//     let parent = Path::new(&path).parent().unwrap();
+//     let _ = fs::create_dir_all(parent).unwrap();
+//     path
+// }
 
 pub fn get_server_weight() -> usize {
     APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.weight }).unwrap_or(1)
 }
 
-pub fn get_server_data_root() -> String {
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.data_root }).unwrap_or(format!(".ayisha/{}", get_server_namespace()))
+pub fn get_server_data_root() -> PathBuf {
+    let pwd = env::current_dir().unwrap();
+    let default_data_root = pwd.join(format!(".{}", env!("CARGO_PKG_NAME")));
+    let data_root = APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.data_root }).unwrap_or(default_data_root.display().to_string());
+
+    let path = Path::new(&data_root).to_path_buf();
+    fs::create_dir_all(&path).unwrap();
+    path
+}
+
+pub fn get_server_root() -> PathBuf {
+    let path = get_server_data_root().join(format!("{}", get_server_id()));
+    fs::create_dir_all(&path).unwrap();
+    path
 }
 
 pub fn get_nodes() -> Vec<AppConfigNode> {

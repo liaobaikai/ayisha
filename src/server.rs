@@ -5,12 +5,29 @@ use std::{
     }
 };
 use actix::prelude::*;
+use parking_lot::{Condvar, Mutex};
 use rand::{rngs::ThreadRng, Rng};
-use serde::{Deserialize, Serialize};
 
-use crate::{config, db::Node, ws::{self, Attribute, WsEvent, WsRequest, WsResponse}};
+use crate::{config, pom::{PoManager, State}, ws::{self, WsEvent, WsRequest, WsResponse}};
 // https://github.com/actix/examples/blob/master/websockets/chat/src/server.rs
 // https://cloud.tencent.com/developer/article/1756850
+
+
+// https://course.rs/advance/concurrency-with-threads/sync1.html
+use lazy_static::lazy_static;
+lazy_static! {
+    // pub static ref POLL_MUTEX: Mutex<usize> = Mutex::new(0);
+    // pub static ref TERM_MUTEX: Mutex<usize> = Mutex::new(0);
+    // pub static ref TRANX_MUTEX: Mutex<usize> = Mutex::new(0);
+
+    pub static ref GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, State>, Condvar)> = Arc::new((Mutex::new(State::new()), Condvar::new()));
+    // pub static ref GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
+    pub static ref GLOBAL_STATE_DATA: State = State::new();
+
+    // 当Voter 以及 server 端需要修改数据的时候，需要先获取锁，如果获取不到锁，则需要等待。
+    // 全局锁
+    // pub static ref GLOBAL_STATE_MUTEX: Mutex<usize> = Mutex::new(0);
+}
 
 /// Chat server sends this messages to session
 #[derive(Message)]
@@ -25,9 +42,11 @@ pub struct Message(pub String);
 #[rtype(usize)]
 pub struct Connect {
     // pub id: usize,
-    pub id: usize,
+    pub server_id: usize,
+    pub voter_id: usize,
     pub addr: Recipient<Message>,
-    pub ip: IpAddr
+    pub ip: IpAddr,
+    pub namespace: String,
 }
 
 /// Session is disconnected
@@ -61,9 +80,9 @@ pub struct ClientMessage {
 /// List of available clusters
 // pub struct ListClusters;
 
-impl actix::Message for WsResponse {
-    type Result = Attribute;
-}
+// impl actix::Message for WsResponse {
+//     type Result = Attribute;
+// }
 
 // pub struct JoinEvent;
 // impl actix::Message for JoinEvent {
@@ -75,7 +94,7 @@ impl actix::Message for WsResponse {
 #[rtype(Join)]
 pub struct Join {
     pub session_id: usize,
-    pub attr: Attribute
+    pub state: State
 }
 
 // 数据同步
@@ -83,15 +102,18 @@ pub struct Join {
 #[rtype(Copy)]
 pub struct Copy {
     pub session_id: usize,
-    pub attr: Attribute
+    pub state: State
 }
 
-// header竞选
+// 投票
 #[derive(Message)]
-#[rtype(Election)]
-pub struct Election {
+#[rtype(Vote)]
+pub struct Vote {
     pub session_id: usize,
-    pub attr: Attribute
+    // 实际数据
+    pub state: State,
+    // 是否投票成功
+    pub ok: bool
 }
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
@@ -106,30 +128,41 @@ pub struct ChatServer {
     namespaces: HashMap<String, HashSet<usize>>,
     visitor_count: Arc<AtomicUsize>,
     rng: ThreadRng,
-    s_attr: Attribute,
-    attrs: HashMap<usize, Attribute>,
-    // 投票箱：server_id, poll
-    polling_box: HashMap<usize, usize>,
+    pom: PoManager,
 
-    
+    pair: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)>,
+
+    // 投票来源: voter_id, poll (投票人 ID，票数)
+    poll_from: HashMap<usize, usize>,
+    // 候选人状态信息
+    c_state: State,
+    // 本地连接
+    local_session_list: Vec<usize>,
 }
 
 
 impl ChatServer {
-    pub fn new(visitor_count: Arc<AtomicUsize>, s_attr: Attribute) -> ChatServer {
+
+    // static GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
+    pub fn new(visitor_count: Arc<AtomicUsize>, pom: PoManager) -> ChatServer {
         // default namespaces
-        let mut namespaces = HashMap::new();
-        namespaces.insert(config::get_server_namespace(), HashSet::new());
+        // let namespaces = HashMap::new();
+        // namespaces.insert(ns.clone(), HashSet::new());
+        let pair = Arc::new((Mutex::new(false), Condvar::new()));
+        // let pair2 = GLOBAL_STATE_MUTEX_PAIR.clone();
+        // let &(ref lock, ref cvar) = &*pair2;
 
         ChatServer {
             sessions: HashMap::new(),
             // session_map: HashMap::new(),
-            namespaces,
+            namespaces: HashMap::new(),
             visitor_count,
             rng: rand::thread_rng(),
-            s_attr,
-            attrs: HashMap::new(),
-            polling_box: HashMap::new(),
+            pair,
+            pom,
+            poll_from: HashMap::new(),
+            c_state: State::new(),
+            local_session_list: Vec::new()
         }
     }
 }
@@ -145,6 +178,15 @@ impl ChatServer {
                     }
                 }
             }
+        }
+    }
+
+    fn update_state(&self){
+        let &(ref lock, ref cvar) = &*self.pair;
+        let mut started = lock.lock();
+        if !*started {
+            println!("cvar wait");
+            cvar.wait(&mut started);
         }
     }
 }
@@ -173,10 +215,17 @@ impl Handler<Connect> for ChatServer {
         let session_id = self.rng.gen::<usize>();
         self.sessions.insert(session_id, msg.addr);
 
-        println!("SESSION_ID: {}", session_id);
+        // 本地连接
+        if msg.server_id == msg.voter_id {
+            log::debug!("[{}] - [{}] - Local Session created, session ID is {}", msg.server_id, msg.voter_id, session_id);
+            self.local_session_list.push(session_id);
+        } else {
+            log::debug!("[{}] - [{}] - Session created, session ID is {}", msg.server_id, msg.voter_id, session_id);
+        }
+        
 
         // self.session_map.insert(session_id, msg.id);
-        self.namespaces.entry(config::get_server_namespace()).or_default().insert(session_id);
+        self.namespaces.entry(msg.namespace).or_default().insert(session_id);
 
         // let _ = self.visitor_count.fetch_add(1, Ordering::SeqCst);
         // let count = self.visitor_count.load(Ordering::SeqCst);
@@ -200,28 +249,28 @@ impl Handler<Join> for ChatServer {
     fn handle(&mut self, mut msg: Join, _: &mut Context<Self>) -> Self::Result {
 
         // 一票投给本机服务端
-        if self.s_attr.id == msg.attr.id && msg.attr.poll > 0 && self.polling_box.get(&msg.attr.id).is_none() {
-            self.polling_box.insert(msg.attr.id, msg.attr.poll);
-            self.s_attr.poll += msg.attr.poll;
-            msg.attr.poll -= 1;
-            log::debug!("Update Server Poll: {}, Client Poll: {}", self.s_attr.poll, msg.attr.poll);
-        }
+        // if self.s_attr.id == msg.attr.id && msg.attr.poll > 0 && self.polling_box.get(&msg.attr.id).is_none() {
+        //     self.polling_box.insert(msg.attr.id, msg.attr.poll);
+        //     self.s_attr.poll += msg.attr.poll;
+        //     msg.attr.poll -= 1;
+        //     log::debug!("Update Server Poll: {}, Client Poll: {}", self.s_attr.poll, msg.attr.poll);
+        // }
 
-        // 连接上的节点数
-        self.attrs.insert(msg.attr.id, msg.attr.clone());
+        // // 连接上的节点数
+        // self.attrs.insert(msg.attr.id, msg.attr.clone());
 
-        // 加入后判断是否需要进行数据同步
+        // // 加入后判断是否需要进行数据同步
         
-        // 本机数据广播到其他会话,并排除自己
-        for (ns, _) in self.namespaces.clone() {
-            let mut wsdata = msg.attr.clone();
-            // 其他节点需要接收该数据
-            wsdata.status = ws::WsDataStatus::RECV;
-            // wsdata.tranx += 1;
-            // 投票传递
-            let resp = WsResponse::success(ws::WsEvent::BROADCAST, format!("Join and Copy data from {}", msg.attr.id), Some(wsdata));
-            self.send_message(&ns, &resp.to_string(), msg.session_id);
-        }
+        // // 本机数据广播到其他会话,并排除自己
+        // for (ns, _) in self.namespaces.clone() {
+        //     let mut wsdata = msg.attr.clone();
+        //     // 其他节点需要接收该数据
+        //     wsdata.status = ws::WsDataStatus::RECV;
+        //     // wsdata.tranx += 1;
+        //     // 投票传递
+        //     let resp = WsResponse::success(ws::WsEvent::BROADCAST, format!("Join and Copy data from {}", msg.attr.id), Some(wsdata));
+        //     self.send_message(&ns, &resp.to_string(), msg.session_id);
+        // }
 
 
         // 投票周期
@@ -256,101 +305,122 @@ impl Handler<Copy> for ChatServer {
     // 1 => 本机投票周期比加入节点的要大,加入节点需要同步数据
     // 2 => 投票周期一致,未进行数据同步
 
-    fn handle(&mut self, mut msg: Copy, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Copy, _: &mut Context<Self>) -> Self::Result {
 
-        // 投票周期
-        let term = self.s_attr.term;
+        // if let Ok(mut mg) = POLL_MUTEX.try_lock() {
+        //     *mg += msg.state.poll;
+        // }
+        let &(ref lock, ref cvar) = &*self.pair.clone();
 
-        // 刚加入的节点
-        log::debug!("term: {}, data.term: {}", term, msg.attr.term);
-        if term > msg.attr.term {
-            // 加入的节点投票周期比本节点小，忽略，忽略该节点的投票信息
-            // 这种场景一般是由于离线较久后恢复。
-            // 加入节点需要同步数据。
-            msg.attr.term = term;
-            // 弃权投票环节
-            msg.attr.poll = 0;
-            msg.attr.status = ws::WsDataStatus::SEND;
-        } else if term < msg.attr.term {
-            // 本机刚恢复，需向其他节点同步数据
-            self.s_attr.term = msg.attr.term;
-            // 弃权投票环节
-            self.s_attr.poll = 0;
-            msg.attr.status = ws::WsDataStatus::RECV;
-        } else {
-            // 不需要同步数据
-            msg.attr.status = ws::WsDataStatus::NONTODO;
-        }
+        // 从 Voter 同步到 Server 端
+        self.c_state = msg.state.clone();
 
-        log::debug!("s_attr: {:?}", self.s_attr);
+        log::debug!("[{}] - [{}] - Copy data from voter, state: `{}`", self.pom.c_state.id, msg.state.id, serde_json::to_string(&self.c_state).unwrap());
+
         MessageResult(msg)
-
     }
     
 }
+
+
 
 // leader竞选
 // 1.term大的直接胜出
 // 2.term相同，事务id大的胜出
 // 3.事务id相同，服务器id大的胜出
+impl Handler<Vote> for ChatServer {
+    type Result = MessageResult<Vote>;
 
-impl Handler<Election> for ChatServer {
-    type Result = MessageResult<Election>;
-
-    fn handle(&mut self, msg: Election, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, mut msg: Vote, _: &mut Context<Self>) -> Self::Result {
         // 3
-        let node_count = config::get_nodes().len();
-        // 加入的数量
-        let join_node_count = self.attrs.keys().len();
-        // 加入计算者本身
-        // join_node_count + 1;
-        let mut min_node_count = node_count / 2;
-        if min_node_count > 1 {
-            min_node_count -= 1;
-        }
+        // let node_count = config::get_nodes().len();
+        // // 加入的数量
+        // let join_node_count = self.attrs.keys().len();
+        // // 加入计算者本身
+        // // join_node_count + 1;
+        // let mut min_node_count = node_count / 2;
+        // if min_node_count > 1 {
+        //     min_node_count -= 1;
+        // }
 
-        // 3个节点，至少超过一半存活
-        if !(join_node_count > min_node_count) {
-            // 需要等待其他节点
-            log::info!("Non election conditions, insufficient voting node, waitting for other node join...");
-            return MessageResult(msg);
-        }
+        // // 3个节点，至少超过一半存活
+        // if !(join_node_count > min_node_count) {
+        //     // 需要等待其他节点
+        //     log::info!("Non election conditions, insufficient voting node, waitting for other node join...");
+        //     return MessageResult(msg);
+        // }
 
-        // 可以开始计算
-        log::info!("Meet election requirements...");
-        // 投票周期
-        let term = self.s_attr.term;
-        // 刚加入的节点
-        let node = msg.attr.clone();
+        // // 可以开始计算
+        // log::info!("Meet election requirements...");
 
-        if term > node.term {
-            // 加入的节点投票周期比本节点小，忽略，忽略该节点的投票信息
+        // 候选人：投票周期
+        let term = self.pom.c_state.term;
+        // 投票人：投票周期
+        let voter_term = msg.state.term;
+        // 是否投票转移
+        let mut change = false;
+        if term > voter_term {
+            // 过期投票、无效投票
+            // 投票人投票周期比本人小，忽略，忽略该节点的投票信息
             // 这种场景一般是由于离线较久后恢复。
             // 加入节点需要同步数据。
-        } else if term < node.term {
-            // 本机刚恢复，需向其他节点同步数据
+        } else if term < voter_term {
+            // 候选人失去候选机会，投票失败，票数转移
+            change = true;
+            log::debug!("[{}] - [{}] - Voting change actively, candidate term is {}, voter term is {}", self.pom.c_state.id, msg.state.id, term, voter_term);
         } else {
-
+            // 投票周期一致
+            // 判断tranx，tranx越大，则越新
+            
             // 事务数
-            let tranx = self.s_attr.tranx;
-            // id
-            let id = self.s_attr.id;
+            let tranx = self.pom.c_state.tranx;
+            let voter_tranx = msg.state.tranx;
 
             // 比较事务数，事务数越大，则代表该节点的数据越新
-            if tranx > node.tranx {
+            if tranx > voter_tranx {
                 // 本机作为leader
-            } else if tranx == node.tranx {
-                // 根据ID比较
-                if id > node.id { 
-                    // 本机作为leader
-                } else {
-                    // 任一作为leader
+            } else if tranx < voter_tranx {
+                // 候选人失去候选机会，投票失败，票数转移
+                change = true;
+                log::debug!("[{}] - [{}] - Voting change actively, candidate tranx is {}, voter tranx is {}", self.pom.c_state.id, msg.state.id, tranx, voter_tranx);
+            } else {
+                // 比对 ID，ID 越大，就投票给大的
+                let id = self.pom.c_state.id;
+                let voter_id = msg.state.id;
+                if id < voter_id {
+                    // 候选人失去候选机会，投票失败，票数转移
+                    change = true;
+                    log::debug!("[{}] - [{}] - Voting change actively, candidate id is {}, voter id is {}", self.pom.c_state.id, msg.state.id, id, voter_id);
                 }
             }
-
         }
 
-        MessageResult(msg)
+        if change {
+            // 投票转移
+            msg.state.poll = self.pom.c_state.poll;
+            log::debug!("[{}] - [{}] - Voting change actively, change votes {} to voter {}", self.pom.c_state.id, msg.state.id, self.pom.c_state.poll, msg.state.id);
+            self.pom.c_state.poll = 0;
+        } else {
+            // 投票确认
+            self.pom.c_state.poll += msg.state.poll;
+            log::debug!("[{}] - [{}] - Voting confirmed, received votes {}, total votes {}", self.pom.c_state.id, msg.state.id, msg.state.poll, self.pom.c_state.poll);
+            msg.state.poll = 0;
+            msg.ok = true;
+        }
+        
+        // 刷盘
+        self.pom.c_flush();
+
+        // 数据同步到Voter
+        for sid in self.local_session_list.iter() {
+            if let Some(addr) = self.sessions.get(sid) {
+                let message = WsResponse::ok(WsEvent::COPY, "Copy to Voter".to_owned(), Some(self.c_state.clone())).to_string();
+                addr.do_send(Message(message));
+            }
+        }
+        
+        
+        return MessageResult(msg);
 
     }
     

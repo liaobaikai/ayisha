@@ -1,0 +1,38 @@
+[map]
+# Host Based Authorization - Ident
+
+# Keyword:
+# ALL、default
+
+# ---------------------------------------------------------------
+# IPv4
+# ---------------------------------------------------------------
+# 0.0.0.0      : Unspecified Address
+# 0.0.0.0/0    : Default Route
+# 127.0.0.1/32 : Loopback Address
+# "127.0.0.1/32" = [
+#     { user = "ALL", app_key = "abf34233-db57-4915-8471-75ae53412e8b", app_secret = "8de3d93b-4a55-4aba-8cb0-a72ab63c9778", namespace = "default" },
+#     { user = "ALL", app_key = "10f357e5-100b-4639-a93c-3863845fdb08", app_secret = "fadf8748-35ac-4193-baea-4b5fd2edd722", namespace = "default" },
+# ]
+
+# ---------------------------------------------------------------
+# IPv6
+# ---------------------------------------------------------------
+# ::/128 : Unspecified Address
+# ::/0   : Default Route
+# ::1/128: Loopback Address
+"::1/128" = [
+    { user = "ALL", app_key = "abf34233-db57-4915-8471-75ae53412e8b", app_secret = "8de3d93b-4a55-4aba-8cb0-a72ab63c9778", namespace = "default" },
+]
+
+# ---------------------------------------------------------------
+# ALL 
+# ---------------------------------------------------------------
+# 0.0.0.0/0 ALL-IPv4
+"0.0.0.0/0" = [
+    { user = "ALL", app_key = "10f357e5-100b-4639-a93c-3863845fdb08", app_secret = "fadf8748-35ac-4193-baea-4b5fd2edd722", namespace = "default" },
+]
+# ::/0      ALL-IPv6
+"::/0" = [
+    { user = "ALL", app_key = "10f357e5-100b-4639-a93c-3863845fdb08", app_secret = "fadf8748-35ac-4193-baea-4b5fd2edd722", namespace = "default" },
+]

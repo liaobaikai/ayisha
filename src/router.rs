@@ -2,7 +2,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
     time::Instant,
 };
-use actix_web::{ web, Error, HttpRequest, HttpResponse, Responder};
+use actix_web::{ web, Error, HttpRequest, HttpResponse, Responder, ResponseError};
 use actix::*;
 use actix_web_actors::ws;
 
@@ -23,43 +23,36 @@ use crate::{config, server, servlet, session};
 
 // ws://<path>/im/chat/123456?app_id=yyy&app_key=xxx
 async fn chat_route(
-    params: web::Path<(String, usize)>,
+    params: web::Path<(String, usize, usize)>,
     req: HttpRequest,
     stream: web::Payload,
     srv: web::Data<Addr<server::ChatServer>>,
 ) -> Result<HttpResponse, Error> {
 
     let ip = req.peer_addr().unwrap().ip();
-
-    // let nid;
-    // match args.parse::<usize>() {
-    //     Ok(i) => {
-    //         nid = i;
-
-    //     },
-    //     Err(_) => {
-    //         log::error!("Request from {}, Connection not ready, Received invalid parameters: id=`{}`", ipaddr, args.1);
-    //         return Ok(HttpResponse::Forbidden().finish());
-    //     }
-    // };
-
     let namespace = params.0.clone();
-    // match namespace.as_str() {
-    //     "main" | "defaults" => {},
-    //     _ => {
 
-    //     }
-    // }
-    if namespace != config::get_server_namespace() {
-        // 
+    let mut pass = false;
+    for ns in config::get_server_namespaces().iter() {
+        if ns.eq_ignore_ascii_case(&namespace) {
+            pass = true;
+            break;
+        }
     }
 
+    if !pass {
+        // 无效的连接
+        return Err(actix_web::error::ErrorForbidden(format!("Invalid path parameter: namespace=`{}`", namespace)));
+    }
 
-    let id = params.1;
+    let server_id = params.1;
+    let voter_id = params.2;
 
+    log::debug!("[{}] - {} - Connection ready, endpoint: {}", server_id, ip, req.full_url());
     ws::start(
         session::WsChatSession {
-            id,
+            server_id,
+            voter_id,
             session_id: 0,
             hb: Instant::now(),
             namespace,
@@ -81,7 +74,7 @@ pub fn config(cfg: &mut web::ServiceConfig) {
     // )
     // .service(web::resource("/").to(index))
     // .service(Files::new("/static", "./static"))
-    cfg.service(web::resource("/im/chat/{namespace}/{id}").guard(servlet::imguard::IMGuard).to(chat_route))
+    cfg.service(web::resource("/im/chat/{namespace}/{server_id}/{voter_id}").guard(servlet::imguard::IMGuard).to(chat_route))
     .default_service(
         web::route().guard(servlet::imguard::IMGuard).to(HttpResponse::Unauthorized)
     );
