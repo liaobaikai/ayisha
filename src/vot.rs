@@ -252,16 +252,12 @@ impl VoteHandler {
                             }
                         }
 
-                        let state = State::new(&sga);
-                        sga.poll = 0;
-
-                        let event = event.clone();
-
                         let src = WsRequest{
-                            event,
-                            state
+                            event: event.clone(),
+                            state: State::new(&sga)
                         }.to_bytestr();
 
+                        // log::debug!("[{myid}] - [{server_id}] - TX send: `{}`", src);
                         if let Err(e) = tx.send(src) {
                             log::error!("[{myid}] - [{server_id}] - TX send failed, cause: {e}");
                             break;
