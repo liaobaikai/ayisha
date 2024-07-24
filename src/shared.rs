@@ -10,16 +10,14 @@ lazy_static! {
 
 #[derive(Clone)]
 pub struct ShareGlobalArea {
-
     // 票数
     pub poll: usize,
     // 事务
     pub tranx: usize,
     // 投票周期
     pub term: usize,
-
-    pub lock: Arc<parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>>
-
+    // 投票给我的有哪些voter ID
+    pub voters: Vec<usize>
 }
 
 impl ShareGlobalArea {
@@ -29,7 +27,18 @@ impl ShareGlobalArea {
             poll: 0,
             tranx: 0,
             term: 0,
-            lock: Arc::new(Mutex::new(false))
+            voters: Vec::new()
         } 
+    }
+
+    // false: 已经投票过，无需重复投票
+    // true: 投票成功
+    pub fn vote(&mut self, voter_id: usize) -> bool {
+
+        if self.voters.contains(&voter_id) {
+            return false;
+        }
+        self.voters.push(voter_id);
+        self.voters.contains(&voter_id)
     }
 }

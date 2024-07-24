@@ -7,7 +7,7 @@ use tokio::{select, sync::mpsc::{self}, time::{self, Instant}};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::{config, pom::{PoManager, State}, servlet, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
+use crate::{config, pom::{PoManager, State}, servlet, shared, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
 
 pub struct VoteHandler {
     pom: PoManager,
@@ -73,13 +73,15 @@ impl VoteHandler {
             // if pom.v_state.poll == 0 {
             //     event = WsEvent::JOIN;
             // }
-            if server_id == voter_id {
-                // 只需要同步数据即可。
-                // 从磁盘中将数据写入内存中
-                // Voter -> Candidate
-                // 主动同步数据
-                event = WsEvent::COPY;
-            }
+            // if server_id == voter_id {
+            //     // 只需要同步数据即可。
+            //     // 从磁盘中将数据写入内存中
+            //     // Voter -> Candidate
+            //     // 主动同步数据
+            //     event = WsEvent::COPY;
+            // }
+
+            let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
 
             loop {
                 select! {

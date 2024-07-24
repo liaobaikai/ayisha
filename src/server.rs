@@ -8,26 +8,26 @@ use actix::prelude::*;
 use parking_lot::{Condvar, Mutex};
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::{config, pom::{PoManager, State}, ws::{self, WsEvent, WsRequest, WsResponse}};
+use crate::{config, pom::{PoManager, State}, shared, ws::{self, WsEvent, WsRequest, WsResponse}};
 // https://github.com/actix/examples/blob/master/websockets/chat/src/server.rs
 // https://cloud.tencent.com/developer/article/1756850
 
 
 // https://course.rs/advance/concurrency-with-threads/sync1.html
-use lazy_static::lazy_static;
-lazy_static! {
-    // pub static ref POLL_MUTEX: Mutex<usize> = Mutex::new(0);
-    // pub static ref TERM_MUTEX: Mutex<usize> = Mutex::new(0);
-    // pub static ref TRANX_MUTEX: Mutex<usize> = Mutex::new(0);
+// use lazy_static::lazy_static;
+// lazy_static! {
+//     // pub static ref POLL_MUTEX: Mutex<usize> = Mutex::new(0);
+//     // pub static ref TERM_MUTEX: Mutex<usize> = Mutex::new(0);
+//     // pub static ref TRANX_MUTEX: Mutex<usize> = Mutex::new(0);
 
-    pub static ref GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, State>, Condvar)> = Arc::new((Mutex::new(State::new()), Condvar::new()));
-    // pub static ref GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
-    pub static ref GLOBAL_STATE_DATA: State = State::new();
+//     pub static ref GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, State>, Condvar)> = Arc::new((Mutex::new(State::new()), Condvar::new()));
+//     // pub static ref GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
+//     pub static ref GLOBAL_STATE_DATA: State = State::new();
 
-    // 当Voter 以及 server 端需要修改数据的时候，需要先获取锁，如果获取不到锁，则需要等待。
-    // 全局锁
-    // pub static ref GLOBAL_STATE_MUTEX: Mutex<usize> = Mutex::new(0);
-}
+//     // 当Voter 以及 server 端需要修改数据的时候，需要先获取锁，如果获取不到锁，则需要等待。
+//     // 全局锁
+//     // pub static ref GLOBAL_STATE_MUTEX: Mutex<usize> = Mutex::new(0);
+// }
 
 /// Chat server sends this messages to session
 #[derive(Message)]
@@ -130,7 +130,7 @@ pub struct ChatServer {
     rng: ThreadRng,
     pom: PoManager,
 
-    pair: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)>,
+    // pair: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)>,
 
     // 投票来源: voter_id, poll (投票人 ID，票数)
     poll_from: HashMap<usize, usize>,
@@ -148,7 +148,7 @@ impl ChatServer {
         // default namespaces
         // let namespaces = HashMap::new();
         // namespaces.insert(ns.clone(), HashSet::new());
-        let pair = Arc::new((Mutex::new(false), Condvar::new()));
+        // let pair = Arc::new((Mutex::new(false), Condvar::new()));
         // let pair2 = GLOBAL_STATE_MUTEX_PAIR.clone();
         // let &(ref lock, ref cvar) = &*pair2;
 
@@ -158,7 +158,7 @@ impl ChatServer {
             namespaces: HashMap::new(),
             visitor_count,
             rng: rand::thread_rng(),
-            pair,
+            // pair,
             pom,
             poll_from: HashMap::new(),
             c_state: State::new(),
@@ -181,13 +181,12 @@ impl ChatServer {
         }
     }
 
-    fn update_state(&self){
-        let &(ref lock, ref cvar) = &*self.pair;
-        let mut started = lock.lock();
-        if !*started {
-            println!("cvar wait");
-            cvar.wait(&mut started);
-        }
+    fn update_sga_add_poll(&self, poll: usize){
+        let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
+        let mut sga = lock.lock();
+        sga.poll += poll;
+        // 通知其他可以修改数据
+        cvar.notify_all();
     }
 }
 
@@ -310,12 +309,12 @@ impl Handler<Copy> for ChatServer {
         // if let Ok(mut mg) = POLL_MUTEX.try_lock() {
         //     *mg += msg.state.poll;
         // }
-        let &(ref lock, ref cvar) = &*self.pair.clone();
+        // let &(ref lock, ref cvar) = &*self.pair.clone();
 
         // 从 Voter 同步到 Server 端
-        self.c_state = msg.state.clone();
+        // self.c_state = msg.state.clone();
 
-        log::debug!("[{}] - [{}] - Copy data from voter, state: `{}`", self.pom.c_state.id, msg.state.id, serde_json::to_string(&self.c_state).unwrap());
+        // log::debug!("[{}] - [{}] - Copy data from voter, state: `{}`", self.pom.c_state.id, msg.state.id, serde_json::to_string(&self.c_state).unwrap());
 
         MessageResult(msg)
     }

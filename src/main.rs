@@ -27,6 +27,7 @@ async fn main() -> std::io::Result<()> {
 
     // let pair = Arc::new((Mutex::new(false), Condvar::new()));
     // let data1 = server::GLOBAL_STATE_DATA.clone();
+    /*
     let mut sga = ShareGlobalArea::new();
     let mut flag = false;
 
@@ -69,6 +70,8 @@ async fn main() -> std::io::Result<()> {
         
     }
 
+    */
+
     // thread::sleep(Duration::from_secs(10));
 
     // let pair3 = shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
@@ -85,8 +88,6 @@ async fn main() -> std::io::Result<()> {
 
 
     // exit(0);
-
-    /*
 
     // 查询本地数据库的所有配置是否有效
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
@@ -121,8 +122,8 @@ async fn main() -> std::io::Result<()> {
 
         // 读取本机有多少投票
         // 预设为 1 票
-        let votes = app_state.clone();
-        votes.fetch_add(1, Ordering::SeqCst);
+        // let votes = app_state.clone();
+        // votes.fetch_add(1, Ordering::SeqCst);
 
         // let cloned_pom = pom.clone();
         // let local_server_id = cloned_pom.v_state.id as u16;
@@ -143,6 +144,7 @@ async fn main() -> std::io::Result<()> {
         // 同时只有一个在
 
         // let semaphore = Arc::new(Semaphore::new(3));
+        
 
         for server in config::get_nodes() {
             // let node_id = format!("{}", node.id);
@@ -181,6 +183,6 @@ async fn main() -> std::io::Result<()> {
     
     println!("OK.");
 
-     */
+    
     Ok(())
 }
