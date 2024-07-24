@@ -252,10 +252,14 @@ impl VoteHandler {
                             }
                         }
 
+                        // 连接123，数据重装，将票数来源
+
                         let src = WsRequest{
                             event: event.clone(),
                             state: State::new(&sga)
                         }.to_bytestr();
+                        // 票数置0
+                        sga.poll = 0;
 
                         // log::debug!("[{myid}] - [{server_id}] - TX send: `{}`", src);
                         if let Err(e) = tx.send(src) {
