@@ -126,9 +126,9 @@ pub struct ChatServer {
     // SESSION_ID, UID
     // session_map: HashMap<usize, usize>,
     namespaces: HashMap<String, HashSet<usize>>,
-    visitor_count: Arc<AtomicUsize>,
+    // visitor_count: Arc<AtomicUsize>,
     rng: ThreadRng,
-    pom: PoManager,
+    // pom: PoManager,
 
     // pair: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)>,
 
@@ -144,7 +144,7 @@ pub struct ChatServer {
 impl ChatServer {
 
     // static GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
-    pub fn new(visitor_count: Arc<AtomicUsize>, pom: PoManager) -> ChatServer {
+    pub fn new() -> ChatServer {
         // default namespaces
         // let namespaces = HashMap::new();
         // namespaces.insert(ns.clone(), HashSet::new());
@@ -156,10 +156,10 @@ impl ChatServer {
             sessions: HashMap::new(),
             // session_map: HashMap::new(),
             namespaces: HashMap::new(),
-            visitor_count,
+            // visitor_count,
             rng: rand::thread_rng(),
             // pair,
-            pom,
+            // pom,
             poll_from: HashMap::new(),
             c_state: State::new(),
             local_session_list: Vec::new()
@@ -352,8 +352,10 @@ impl Handler<Vote> for ChatServer {
         // // 可以开始计算
         // log::info!("Meet election requirements...");
 
+        let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
+        let mut sga = lock.lock();
         // 候选人：投票周期
-        let term = self.pom.c_state.term;
+        let term = sga.term;
         // 投票人：投票周期
         let voter_term = msg.state.term;
         // 是否投票转移
@@ -366,7 +368,7 @@ impl Handler<Vote> for ChatServer {
         } else if term < voter_term {
             // 候选人失去候选机会，投票失败，票数转移
             change = true;
-            log::debug!("[{}] - [{}] - Voting change actively, candidate term is {}, voter term is {}", self.pom.c_state.id, msg.state.id, term, voter_term);
+            log::debug!("[{}] - [{}] - Voting change actively, candidate term is {}, voter term is {}", sga.myid, msg.state.id, term, voter_term);
         } else {
             // 投票周期一致
             // 判断tranx，tranx越大，则越新

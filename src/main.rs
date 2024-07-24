@@ -100,10 +100,10 @@ async fn main() -> std::io::Result<()> {
     // 服务端的票数
     // let vote = Arc::new(AtomicUsize::new(0));
 
-    let pom = PoManager::new();
+    // let pom = PoManager::new();
 
     // 获取本机信息
-    let server = server::ChatServer::new(app_state.clone(), pom.clone()).start();
+    let server = server::ChatServer::new().start();
 
     let http_server = HttpServer::new(move || {
         App::new()
@@ -148,9 +148,10 @@ async fn main() -> std::io::Result<()> {
 
         for server in config::get_nodes() {
             // let node_id = format!("{}", node.id);
-            let cloned_pom = pom.clone();
             let server_id = server.id;
-            let local_id = cloned_pom.v_state.id;
+            if server_id == config::get_server_id() {
+                continue;
+            }
             // if server_id as usize == local_id {
             //     continue;
             // }
@@ -159,7 +160,7 @@ async fn main() -> std::io::Result<()> {
             
             let voter_handle = actix::spawn(async move {
 
-                let vh = vot::VoteHandler::new(cloned_pom, server_addr, server_port, server_id);
+                let vh = vot::VoteHandler::new(server_addr, server_port, server_id);
                 loop {
                     let connect_failed = vh.start(&config::get_client_app_key(), &config::get_client_app_secret()).await;
                     if connect_failed {

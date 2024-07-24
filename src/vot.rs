@@ -10,7 +10,6 @@ use tokio_util::sync::CancellationToken;
 use crate::{config, pom::{PoManager, State}, servlet, shared, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
 
 pub struct VoteHandler {
-    pom: PoManager,
     addr: String,
     port: u16,
     server_id: usize,
@@ -18,10 +17,9 @@ pub struct VoteHandler {
 
 impl VoteHandler {
 
-    pub fn new(pom: PoManager, addr: String, port: u16, server_id: usize) -> Self {
+    pub fn new(addr: String, port: u16, server_id: usize) -> Self {
 
         VoteHandler {
-            pom,
             addr,
             port,
             server_id,
@@ -51,10 +49,10 @@ impl VoteHandler {
         // let inner_id2 = String::from(id);
         
         // let mut c_attr = self.pom.clone();
-        let mut pom = self.pom.clone();
+        // let mut pom = self.pom.clone();
         // pom.v_state.id = self.server_id;
-        let voter_id = pom.v_state.id;
-        let cloned_voter_id = voter_id.clone();
+        // let voter_id = pom.v_state.id;
+        // let cloned_voter_id = voter_id.clone();
         
         
         // 启动定时发送任务
