@@ -8,7 +8,7 @@ use actix::prelude::*;
 use parking_lot::{Condvar, Mutex};
 use rand::{rngs::ThreadRng, Rng};
 
-use crate::{config, pom::{PoManager, State}, shared, ws::{self, WsEvent, WsRequest, WsResponse}};
+use crate::{shared::{self, State}, ws::{self, WsEvent, WsRequest, WsResponse}};
 // https://github.com/actix/examples/blob/master/websockets/chat/src/server.rs
 // https://cloud.tencent.com/developer/article/1756850
 
@@ -42,7 +42,7 @@ pub struct Message(pub String);
 #[rtype(usize)]
 pub struct Connect {
     // pub id: usize,
-    pub server_id: usize,
+    pub myid: usize,
     pub voter_id: usize,
     pub addr: Recipient<Message>,
     pub ip: IpAddr,
@@ -135,9 +135,9 @@ pub struct ChatServer {
     // 投票来源: voter_id, poll (投票人 ID，票数)
     poll_from: HashMap<usize, usize>,
     // 候选人状态信息
-    c_state: State,
+    // c_state: State,
     // 本地连接
-    local_session_list: Vec<usize>,
+    // local_session_list: Vec<usize>,
 }
 
 
@@ -161,8 +161,8 @@ impl ChatServer {
             // pair,
             // pom,
             poll_from: HashMap::new(),
-            c_state: State::new(),
-            local_session_list: Vec::new()
+            // c_state: State::new(),
+            // local_session_list: Vec::new()
         }
     }
 }
@@ -214,13 +214,7 @@ impl Handler<Connect> for ChatServer {
         let session_id = self.rng.gen::<usize>();
         self.sessions.insert(session_id, msg.addr);
 
-        // 本地连接
-        if msg.server_id == msg.voter_id {
-            log::debug!("[{}] - [{}] - Local Session created, session ID is {}", msg.server_id, msg.voter_id, session_id);
-            self.local_session_list.push(session_id);
-        } else {
-            log::debug!("[{}] - [{}] - Session created, session ID is {}", msg.server_id, msg.voter_id, session_id);
-        }
+        log::debug!("[{}] - [{}] - Session created, session ID is {}", msg.myid, msg.voter_id, session_id);
         
 
         // self.session_map.insert(session_id, msg.id);
@@ -368,13 +362,13 @@ impl Handler<Vote> for ChatServer {
         } else if term < voter_term {
             // 候选人失去候选机会，投票失败，票数转移
             change = true;
-            log::debug!("[{}] - [{}] - Voting change actively, candidate term is {}, voter term is {}", sga.myid, msg.state.id, term, voter_term);
+            log::debug!("[{}] - [{}] - Voting change actively, candidate term is {}, voter term is {}", sga.myid, msg.state.myid, term, voter_term);
         } else {
             // 投票周期一致
             // 判断tranx，tranx越大，则越新
             
             // 事务数
-            let tranx = self.pom.c_state.tranx;
+            let tranx = sga.tranx;
             let voter_tranx = msg.state.tranx;
 
             // 比较事务数，事务数越大，则代表该节点的数据越新
@@ -383,43 +377,49 @@ impl Handler<Vote> for ChatServer {
             } else if tranx < voter_tranx {
                 // 候选人失去候选机会，投票失败，票数转移
                 change = true;
-                log::debug!("[{}] - [{}] - Voting change actively, candidate tranx is {}, voter tranx is {}", self.pom.c_state.id, msg.state.id, tranx, voter_tranx);
+                log::debug!("[{}] - [{}] - Voting change actively, candidate tranx is {}, voter tranx is {}", sga.myid, msg.state.myid, tranx, voter_tranx);
             } else {
                 // 比对 ID，ID 越大，就投票给大的
-                let id = self.pom.c_state.id;
-                let voter_id = msg.state.id;
+                let id = sga.myid;
+                let voter_id = msg.state.myid;
                 if id < voter_id {
                     // 候选人失去候选机会，投票失败，票数转移
                     change = true;
-                    log::debug!("[{}] - [{}] - Voting change actively, candidate id is {}, voter id is {}", self.pom.c_state.id, msg.state.id, id, voter_id);
+                    log::debug!("[{}] - [{}] - Voting change actively, candidate id is {}, voter id is {}", sga.myid, msg.state.myid, id, voter_id);
                 }
             }
         }
 
         if change {
             // 投票转移
-            msg.state.poll = self.pom.c_state.poll;
-            log::debug!("[{}] - [{}] - Voting change actively, change votes {} to voter {}", self.pom.c_state.id, msg.state.id, self.pom.c_state.poll, msg.state.id);
-            self.pom.c_state.poll = 0;
+            msg.state.vote_from = Some(shared::Vote { id: sga.myid, poll: sga.poll });
+            sga.vote_to = Some(msg.state.myid);
+            log::debug!("[{}] - [{}] - Voting change actively, change votes {} to voter {}", sga.myid, msg.state.myid, sga.poll, msg.state.myid);
+            // 自身投票清空
+            sga.poll = 0;
         } else {
             // 投票确认
-            self.pom.c_state.poll += msg.state.poll;
-            log::debug!("[{}] - [{}] - Voting confirmed, received votes {}, total votes {}", self.pom.c_state.id, msg.state.id, msg.state.poll, self.pom.c_state.poll);
+            sga.poll += msg.state.poll;
+            log::debug!("[{}] - [{}] - Voting confirmed, received votes {}, total votes {}", sga.myid, msg.state.myid, msg.state.poll, sga.poll);
+            // 清空投票者的票数
             msg.state.poll = 0;
+            sga.vote_from(&msg.state.myid);
             msg.ok = true;
         }
+
+        println!("Server Vote: SGA: {:?}", sga.clone());
+        cvar.notify_one();
         
         // 刷盘
-        self.pom.c_flush();
+        // self.pom.c_flush();
 
         // 数据同步到Voter
-        for sid in self.local_session_list.iter() {
-            if let Some(addr) = self.sessions.get(sid) {
-                let message = WsResponse::ok(WsEvent::COPY, "Copy to Voter".to_owned(), Some(self.c_state.clone())).to_string();
-                addr.do_send(Message(message));
-            }
-        }
-        
+        // for sid in self.local_session_list.iter() {
+        //     if let Some(addr) = self.sessions.get(sid) {
+        //         let message = WsResponse::ok(WsEvent::COPY, "Copy to Voter".to_owned(), Some(self.c_state.clone())).to_string();
+        //         addr.do_send(Message(message));
+        //     }
+        // }
         
         return MessageResult(msg);
 
@@ -438,7 +438,7 @@ impl Handler<Disconnect> for ChatServer {
         }
 
         let mut namespaces: Vec<String> = Vec::new();
-        let _ = self.visitor_count.fetch_sub(1, Ordering::SeqCst);
+        // let _ = self.visitor_count.fetch_sub(1, Ordering::SeqCst);
 
         // remove address
         if self.sessions.remove(&msg.id).is_some() {
@@ -454,8 +454,8 @@ impl Handler<Disconnect> for ChatServer {
         for ns in namespaces {
             self.send_message(&ns, &format!("UID {} kicked out of the cluster [{}].", msg.id, ns), 0);
 
-            let count = self.visitor_count.load(Ordering::SeqCst);
-            self.send_message(&ns, &format!("Current Total visitors {count}"), 0);
+            // let count = self.visitor_count.load(Ordering::SeqCst);
+            // self.send_message(&ns, &format!("Current Total visitors {count}"), 0);
         }
     }
 }

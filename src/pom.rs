@@ -62,8 +62,6 @@ pub struct State {
     pub poll: usize,
     // 事务次数，每同步一次数据后 +1
     pub tranx: usize,
-    // 锁
-    pub lock: bool,
 
 }
 
@@ -74,7 +72,6 @@ impl State {
             term: 0,
             poll: 0,
             tranx: 0,
-            lock: false
         } 
     }
 }

@@ -3,7 +3,7 @@ use std::{net::IpAddr, time::{Duration, Instant}};
 use actix::prelude::*;
 use actix_web_actors::ws;
 
-use crate::{server::{self}, ws::{WsEvent, WsRequest, WsResponse}};
+use crate::{config, server::{self}, ws::{WsEvent, WsRequest, WsResponse}};
 
 /// How often heartbeat pings are sent
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -100,7 +100,7 @@ impl Actor for WsChatSession {
         let addr = ctx.address();
         self.addr
             .send(server::Connect {
-                server_id: self.server_id,
+                myid: config::get_server_id(),
                 voter_id: self.voter_id,
                 addr: addr.recipient(),
                 ip: self.ip,

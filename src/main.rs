@@ -3,9 +3,7 @@ use std::{process::exit, sync::{atomic::{AtomicUsize, Ordering}, Arc}, thread, t
 use actix::*;
 use actix_web::{ middleware::Logger, web, App, HttpServer
 };
-use parking_lot::{Condvar, Mutex};
-use pom::PoManager;
-use shared::ShareGlobalArea;
+// use parking_lot::{Condvar, Mutex};
 // use db::Node;
 
 mod server;
@@ -16,7 +14,7 @@ mod auth;
 mod vot;
 mod config;
 mod ws;
-mod pom;
+// mod pom;
 mod shared;
 
 
@@ -144,12 +142,12 @@ async fn main() -> std::io::Result<()> {
         // 同时只有一个在
 
         // let semaphore = Arc::new(Semaphore::new(3));
-        
+        let myid = config::get_server_id();
 
         for server in config::get_nodes() {
             // let node_id = format!("{}", node.id);
-            let server_id = server.id;
-            if server_id == config::get_server_id() {
+            // let server_id = server.id;
+            if server.id == config::get_server_id() {
                 continue;
             }
             // if server_id as usize == local_id {
@@ -160,13 +158,13 @@ async fn main() -> std::io::Result<()> {
             
             let voter_handle = actix::spawn(async move {
 
-                let vh = vot::VoteHandler::new(server_addr, server_port, server_id);
+                let vh = vot::VoteHandler::new(server_addr, server_port);
                 loop {
-                    let connect_failed = vh.start(&config::get_client_app_key(), &config::get_client_app_secret()).await;
+                    let connect_failed = vh.start(server.id, &config::get_client_app_key(), &config::get_client_app_secret()).await;
                     if connect_failed {
-                        log::info!("[{}] - [{}] - Connection not established, wait for {} seconds to retry again", local_id, server.id, config::get_client_connect_retry());
+                        log::info!("[{}] - [{}] - Connection not established, wait for {} seconds to retry again", myid, server.id, config::get_client_connect_retry());
                     } else {
-                        log::info!("[{}] - [{}] - The connection has been disconnected, wait for {} seconds to reconnect", local_id, server.id, config::get_client_connect_retry());
+                        log::info!("[{}] - [{}] - The connection has been disconnected, wait for {} seconds to reconnect", myid, server.id, config::get_client_connect_retry());
                     }
                     tokio::time::sleep(Duration::from_secs(config::get_client_connect_retry() as u64)).await;
                 }

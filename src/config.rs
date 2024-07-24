@@ -104,7 +104,7 @@ impl HostBasedAuth {
     
     pub fn new() -> Self {
 
-        let path = "/Users/lbk/ayisha/hba_ident.toml";
+        let path = "./hba_ident.toml";
 
         let toml_text = fs::read_to_string(path).unwrap();
         let hba: HostBasedAuth = match toml::from_str(&toml_text) {

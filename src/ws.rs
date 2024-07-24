@@ -1,7 +1,7 @@
 use bytestring::ByteString;
 use serde::{Deserialize, Serialize};
 
-use crate::pom::State;
+use crate::shared::State;
 
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
