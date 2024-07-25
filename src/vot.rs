@@ -7,7 +7,7 @@ use tokio::{select, sync::mpsc::{self}, time::{self}};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::{config, servlet, shared::{self, State}, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
+use crate::{config, servlet, shared::{self, State, Vote}, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
 
 pub struct VoteHandler {
     addr: String,
@@ -153,27 +153,35 @@ impl VoteHandler {
                                         if let Some(_) = v.state {
                                             log::debug!("[{}] - [{}] - Voting succcess, change event?", &myid, &server_id);
                                             let mut sga = lock.lock();
+                                            let vote = Vote {
+                                                from_id: server_id,
+                                                poll: sga.poll,
+                                            };
                                             // 我的所有票数置为0
                                             sga.poll = 0;
                                             // 设置我的票数去向
-                                            sga.vote_to = Some(server_id);
+                                            sga.poll_to = Some(vote);
                                             cvar.notify_one();
                                         }
                                     }
                                     WsStatusCode::FAILED=> {
                                         // 投票失败
                                         // 本候选人获取其他候选人的票数
+                                        log::debug!("[{}] - [{}] - Voting Changed, data: `{:?}`", &myid, &server_id, v);
                                         if let Some(state) = v.state {
                                             let mut sga = lock.lock();
                                             // 恢复投票
                                             sga.poll = state.poll;
+                                            let mut poll = state.poll;
                                             // 添加我的支持者
-                                            if let Some(vot) = state.vote_from {
-                                                sga.poll += vot.poll;
-                                                sga.vote_from(&server_id);
+                                            for pf in state.poll_from {
+                                                sga.poll += pf.poll;
+                                                poll += pf.poll;
+                                                sga.poll_from(pf);
                                             }
+                                            println!("Voter.SGA:FAILED: {:?}", sga);
                                             cvar.notify_one();
-                                            log::debug!("[{}] - [{}] - Voting confirmed, received votes {} from {}, total votes {} ", &myid, &server_id, state.poll, &server_id, sga.poll);
+                                            log::debug!("[{}] - [{}] - Voting confirmed, received votes {} from {}, total votes {} ", &myid, &server_id, poll, &server_id, sga.poll);
                                         }
                                     }
 
@@ -183,7 +191,6 @@ impl VoteHandler {
                                 }
 
                             }
-
 
                             ws::WsEvent::CHANGED => {
                                 // 投票转移
@@ -232,13 +239,15 @@ impl VoteHandler {
                         // 没有票数的时候，就等待
                         let mut sga = lock.lock();
 
+                        println!("Voter.SGA:tick: {:?}", sga);
+
                         // 投票来源谁？无需重复投票
-                        if sga.is_vote_from(&server_id) {
+                        if sga.is_poll_from(&server_id).is_some() {
                             log::debug!("[{myid}] - [{server_id}] - Voted from {server_id}, Skip Vote, sleep for 10 seconds to continue");
                             continue;
                         }
                         // 我投票给谁？无需重复投票
-                        if sga.is_vote_to(&server_id) {
+                        if sga.is_poll_to(&server_id).is_some() {
                             log::debug!("[{myid}] - [{server_id}] - Voted to {server_id}, Skip Vote, sleep for 10 seconds to continue");
                             continue;
                         }
@@ -256,6 +265,9 @@ impl VoteHandler {
                             event: event.clone(),
                             state: State::new(&sga)
                         }.to_bytestr();
+                        
+                        // 票数设置为 0
+                        sga.poll = 0;
 
                         // log::debug!("[{myid}] - [{server_id}] - TX send: `{}`", src);
                         if let Err(e) = tx.send(src) {

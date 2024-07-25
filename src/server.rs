@@ -348,6 +348,8 @@ impl Handler<Vote> for ChatServer {
 
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let mut sga = lock.lock();
+        let myid = sga.myid;
+        let vid = msg.state.myid;
         // 候选人：投票周期
         let term = sga.term;
         // 投票人：投票周期
@@ -380,20 +382,21 @@ impl Handler<Vote> for ChatServer {
                 log::debug!("[{}] - [{}] - Voting change actively, candidate tranx is {}, voter tranx is {}", sga.myid, msg.state.myid, tranx, voter_tranx);
             } else {
                 // 比对 ID，ID 越大，就投票给大的
-                let id = sga.myid;
-                let voter_id = msg.state.myid;
-                if id < voter_id {
+                if myid < vid {
                     // 候选人失去候选机会，投票失败，票数转移
                     change = true;
-                    log::debug!("[{}] - [{}] - Voting change actively, candidate id is {}, voter id is {}", sga.myid, msg.state.myid, id, voter_id);
+                    log::debug!("[{}] - [{}] - Voting change actively, candidate id is {}, voter id is {}", sga.myid, msg.state.myid, myid, vid);
                 }
             }
         }
 
         if change {
             // 投票转移
-            msg.state.vote_from = Some(shared::Vote { id: sga.myid, poll: sga.poll });
-            sga.vote_to = Some(msg.state.myid);
+            let v = shared::Vote { from_id: myid, poll: sga.poll };
+            // 更新投票信息
+            msg.state.poll_from.push(v.clone());
+            // 更新自身的投票去香
+            sga.poll_to = Some(v);
             log::debug!("[{}] - [{}] - Voting change actively, change votes {} to voter {}", sga.myid, msg.state.myid, sga.poll, msg.state.myid);
             // 自身投票清空
             sga.poll = 0;
@@ -401,9 +404,12 @@ impl Handler<Vote> for ChatServer {
             // 投票确认
             sga.poll += msg.state.poll;
             log::debug!("[{}] - [{}] - Voting confirmed, received votes {}, total votes {}", sga.myid, msg.state.myid, msg.state.poll, sga.poll);
+            sga.poll_from(shared::Vote {
+                from_id: msg.state.myid,
+                poll: msg.state.poll
+            });
             // 清空投票者的票数
             msg.state.poll = 0;
-            sga.vote_from(&msg.state.myid);
             msg.ok = true;
         }
 

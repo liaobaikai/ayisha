@@ -93,7 +93,7 @@ async fn main() -> std::io::Result<()> {
     log::info!("[{}] - - Server is listen on 0.0.0.0:{}", config::get_server_id(), config::get_server_port());
     log::info!("[{}] - - Server will be running {} workers", config::get_server_id(), config::get_server_worker());
 
-    let app_state = Arc::new(AtomicUsize::new(0));
+    // let app_state = Arc::new(AtomicUsize::new(0));
 
     // 服务端的票数
     // let vote = Arc::new(AtomicUsize::new(0));
