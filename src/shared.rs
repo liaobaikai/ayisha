@@ -21,10 +21,10 @@ pub struct ShareGlobalArea {
     pub tranx: usize,
     // 投票周期
     pub term: usize,
-    // 投票给我的有哪些voter ID
-    pub vote_from: Vec<usize>,
+    // 投票来源
+    pub poll_from: Vec<Vote>,
     // 我投票给那个ID
-    pub vote_to: Option<usize>
+    pub poll_to: Option<Vote>
 }
 
 impl ShareGlobalArea {
@@ -35,27 +35,35 @@ impl ShareGlobalArea {
             poll: 1,
             tranx: 0,
             term: 0,
-            vote_from: Vec::new(),
-            vote_to: None
+            poll_from: Vec::new(),
+            poll_to: None
         } 
     }
 
     // false: 已经投票过，无需重复投票
     // true: 投票成功
-    pub fn vote_from(&mut self, id: &usize) {
-        self.vote_from.push(id.to_owned());
-    }
-
-    pub fn is_vote_from(&mut self, id: &usize) -> bool{
-        self.vote_from.contains(id)
-    }
-
-    pub fn is_vote_to(&mut self, id: &usize) -> bool{
-        if let Some(_id) = &self.vote_to {
-            _id == id
-        } else {
-            false
+    pub fn poll_from(&mut self, v: Vote) {
+        if self.is_poll_from(&v.from_id).is_none() {
+            self.poll_from.push(v);
         }
+    }
+
+    pub fn is_poll_from(&mut self, id: &usize) -> Option<Vote> {
+        for v in self.poll_from.iter() {
+            if v.from_id == id.to_owned() {
+                return Some(v.to_owned());
+            }
+        }
+        None
+    }
+
+    pub fn is_poll_to(&mut self, id: &usize) -> Option<Vote> {
+        if let Some(v) = &self.poll_to {
+            if v.from_id == id.to_owned() {
+                return Some(v.to_owned())
+            }
+        }
+        None
     }
 
 }
@@ -73,26 +81,29 @@ pub struct State {
     // 事务次数，每同步一次数据后 +1
     pub tranx: usize,
     // 支持者
-    pub vote_from: Option<Vote>
+    pub poll_from: Vec<Vote>
 
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Vote {
-    // 支持者ID
-    pub id: usize,
-    // 投票数
+    // 目标 id
+    // pub id: usize,
+    // 投票来源 id
+    pub from_id: usize,
+    // 投出票数
     pub poll: usize,
 }
 
 impl State {
     pub fn new(sga: &ShareGlobalArea) -> Self {
+
         State {
             myid: sga.myid,
             term: sga.term,
             poll: sga.poll,
             tranx: sga.tranx,
-            vote_from: None
+            poll_from: sga.poll_from.clone()
         } 
     }
 }
