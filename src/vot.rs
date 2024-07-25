@@ -81,6 +81,7 @@ impl VoteHandler {
 
             loop {
                 select! {
+
                     _ = cloned_token.cancelled() => {
                         break;
                     }
@@ -154,7 +155,8 @@ impl VoteHandler {
                                             log::debug!("[{}] - [{}] - Voting succcess, change event?", &myid, &server_id);
                                             let mut sga = lock.lock();
                                             let vote = Vote {
-                                                from_id: server_id,
+                                                from_id: myid,
+                                                to_id: server_id,
                                                 poll: sga.poll,
                                             };
                                             // 我的所有票数置为0
@@ -179,7 +181,7 @@ impl VoteHandler {
                                                 poll += pf.poll;
                                                 sga.poll_from(pf);
                                             }
-                                            println!("Voter.SGA:FAILED: {:?}", sga);
+                                            log::debug!("[{}] - [{}] - Voter.SGA:FAILED: {:?}", &myid, &server_id, sga);
                                             cvar.notify_one();
                                             log::debug!("[{}] - [{}] - Voting confirmed, received votes {} from {}, total votes {} ", &myid, &server_id, poll, &server_id, sga.poll);
                                         }
@@ -218,14 +220,13 @@ impl VoteHandler {
                             }
 
                             ws::WsEvent::BROADCAST => {
-                                // 接收广播数据（投票传递）
-                                if let Some(_state) = v.state {
-                                    // // 判断投票情况
-                                    // // 1、如果对方的数据比我要新，则需要改票
-                                    // if data.tranx > c_attr.tranx {
-                                    //     // 对方的数据比我新
-                                    // }
-
+                                if let Some(s) = v.state {
+                                    // 更新 poll_to
+                                    if s.myid == myid {
+                                        log::debug!("SKIP::BROADCAST::::{:?}", s);
+                                    } else {
+                                        log::debug!("BROADCAST::::{:?}", s);
+                                    }
                                 }
                             }
 
@@ -239,7 +240,7 @@ impl VoteHandler {
                         // 没有票数的时候，就等待
                         let mut sga = lock.lock();
 
-                        println!("Voter.SGA:tick: {:?}", sga);
+                        log::debug!("[{myid}] - [{server_id}] - Voter.SGA:tick: {:?}", sga);
 
                         // 投票来源谁？无需重复投票
                         if sga.is_poll_from(&server_id).is_some() {
@@ -252,7 +253,7 @@ impl VoteHandler {
                             continue;
                         }
 
-                        while sga.poll == 0 {
+                        if sga.poll == 0 {
                             log::debug!("[{myid}] - [{server_id}] - sga.poll == 0, cvar.wait...");
                             // 10秒后超时，不等待
                             if cvar.wait_until(&mut sga, Instant::now() + Duration::from_secs(10)).timed_out() {
@@ -262,17 +263,12 @@ impl VoteHandler {
                         }
 
                         // 连接123，数据重装，将票数来源
-
                         let src = WsRequest{
                             event: event.clone(),
                             state: State::new(&sga)
                         }.to_bytestr();
-<<<<<<< HEAD
-                        // 票数置0
-=======
                         
                         // 票数设置为 0
->>>>>>> d691b257a13a84a18f9f20735106d346f85aeac6
                         sga.poll = 0;
 
                         // log::debug!("[{myid}] - [{server_id}] - TX send: `{}`", src);

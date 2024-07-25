@@ -1,8 +1,8 @@
 use std::{
-    collections::{HashMap, HashSet}, net::IpAddr, sync::{
+    clone, collections::{HashMap, HashSet}, net::IpAddr, sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
-    }
+    }, time::{Duration, Instant}
 };
 use actix::prelude::*;
 use parking_lot::{Condvar, Mutex};
@@ -106,14 +106,17 @@ pub struct Copy {
 }
 
 // 投票
-#[derive(Message)]
+#[derive(Debug, Message)]
 #[rtype(Vote)]
 pub struct Vote {
     pub session_id: usize,
     // 实际数据
     pub state: State,
     // 是否投票成功
-    pub ok: bool
+    pub ok: bool,
+    // 锁等待超时
+    pub timeout: bool,
+    pub namespace: String,
 }
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
@@ -325,6 +328,7 @@ impl Handler<Vote> for ChatServer {
     type Result = MessageResult<Vote>;
 
     fn handle(&mut self, mut msg: Vote, _: &mut Context<Self>) -> Self::Result {
+        log::debug!("Server Vote: `{:?}`", msg);
         // 3
         // let node_count = config::get_nodes().len();
         // // 加入的数量
@@ -348,6 +352,17 @@ impl Handler<Vote> for ChatServer {
 
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let mut sga = lock.lock();
+        if sga.poll == 0 {
+            // 自身票数为0，
+            log::debug!("[{}] - [{}] - Server sga.poll == 0, cvar.wait...", sga.myid, msg.state.myid);
+            // 10秒后超时，不等待
+            if cvar.wait_until(&mut sga, Instant::now() + Duration::from_secs(10)).timed_out() {
+                log::debug!("[{}] - [{}] - Server sga.poll == 0, cvar.wait...timeout...", sga.myid, msg.state.myid);
+                msg.timeout = true;
+                return MessageResult(msg);
+            }
+        }
+
         let myid = sga.myid;
         let vid = msg.state.myid;
         // 候选人：投票周期
@@ -392,11 +407,10 @@ impl Handler<Vote> for ChatServer {
 
         if change {
             // 投票转移
-            let v = shared::Vote { from_id: myid, poll: sga.poll };
             // 更新投票信息
-            msg.state.poll_from.push(v.clone());
+            msg.state.poll_from.push(shared::Vote { from_id: myid, to_id: msg.state.myid, poll: sga.poll });
             // 更新自身的投票去香
-            sga.poll_to = Some(v);
+            sga.poll_to = Some(shared::Vote { from_id: myid, to_id: msg.state.myid, poll: sga.poll });
             log::debug!("[{}] - [{}] - Voting change actively, change votes {} to voter {}", sga.myid, msg.state.myid, sga.poll, msg.state.myid);
             // 自身投票清空
             sga.poll = 0;
@@ -404,28 +418,38 @@ impl Handler<Vote> for ChatServer {
             // 投票确认
             sga.poll += msg.state.poll;
             log::debug!("[{}] - [{}] - Voting confirmed, received votes {}, total votes {}", sga.myid, msg.state.myid, msg.state.poll, sga.poll);
-            sga.poll_from(shared::Vote {
-                from_id: msg.state.myid,
-                poll: msg.state.poll
-            });
+            
+            // 正常投票，投票来源
+            for vv in msg.state.poll_from.clone() {
+                sga.poll_from(vv);
+            }
+            sga.poll_from(shared::Vote { from_id: msg.state.myid, to_id: myid, poll: msg.state.poll });
+            msg.state.poll_from.push(shared::Vote { from_id: msg.state.myid, to_id: myid, poll: msg.state.poll });
+
             // 清空投票者的票数
             msg.state.poll = 0;
             msg.ok = true;
         }
 
-        println!("Server Vote: SGA: {:?}", sga.clone());
+        log::debug!("[{}] - [{}] - Server Vote: SGA: {:?}", sga.myid, msg.state.myid, sga.clone());
         cvar.notify_one();
         
-        // 刷盘
-        // self.pom.c_flush();
+        // 广播给其他节点，通知其他节点票已经投出
+        if let Some(sessions) = self.namespaces.get(&msg.namespace) {
+            for sid in sessions {
+                if sid != &msg.session_id {
+                    continue;
+                }
+                if let Some(addr) = self.sessions.get(sid) {
+                    log::debug!("[{}] - [{}] - Server BROADCAST to session: {}...", sga.myid, msg.state.myid, sid);
+                    let message = WsResponse::ok(WsEvent::BROADCAST, "Copy to Voter".to_owned(), Some(msg.state.clone())).to_string();
+                    addr.do_send(Message(message));
+                }
+            }
+        }
+        
+        
 
-        // 数据同步到Voter
-        // for sid in self.local_session_list.iter() {
-        //     if let Some(addr) = self.sessions.get(sid) {
-        //         let message = WsResponse::ok(WsEvent::COPY, "Copy to Voter".to_owned(), Some(self.c_state.clone())).to_string();
-        //         addr.do_send(Message(message));
-        //     }
-        // }
         
         return MessageResult(msg);
 

@@ -258,7 +258,9 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                         let data = server::Vote {
                             session_id: self.session_id,
                             state: v.state.clone(),
-                            ok: false
+                            ok: false,
+                            timeout: false,
+                            namespace: self.namespace.clone()
                         };
                         self.addr.send(data).into_actor(self).then(move |res, _, ctx| {
                             if let Ok(vote) = res {

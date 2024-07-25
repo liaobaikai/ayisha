@@ -59,7 +59,7 @@ impl ShareGlobalArea {
 
     pub fn is_poll_to(&mut self, id: &usize) -> Option<Vote> {
         if let Some(v) = &self.poll_to {
-            if v.from_id == id.to_owned() {
+            if v.to_id == id.to_owned() {
                 return Some(v.to_owned())
             }
         }
@@ -87,10 +87,10 @@ pub struct State {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Vote {
-    // 目标 id
-    // pub id: usize,
     // 投票来源 id
     pub from_id: usize,
+    // 投票去向 id
+    pub to_id: usize,
     // 投出票数
     pub poll: usize,
 }
