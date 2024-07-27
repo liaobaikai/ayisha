@@ -1,20 +1,16 @@
 use bytestring::ByteString;
 use serde::{Deserialize, Serialize};
 
-use crate::shared::State;
-
+use crate::shared::VCData;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WsRequest {
-
     // 事件
     pub event: WsEvent,
 
     // json数据
-    pub state: State
-
+    pub vcd: VCData,
 }
-
 
 // #[derive(Debug, Clone, Deserialize, Serialize)]
 // pub struct Profile {
@@ -49,10 +45,9 @@ pub struct WsResponse {
     // 状态码
     pub status_code: WsStatusCode,
     // 消息
-    pub mail_box: String,
+    pub message: String,
     // json数据
-    pub state: Option<State>,
-
+    pub vcd: Option<VCData>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -60,9 +55,9 @@ pub enum WsStatusCode {
     // 处理成功
     SUCCESS,
     // 指的是处理失败
-    FAILED,     
+    FAILED,
     // 指的是处理过程有发生异常
-    ERROR, 
+    ERROR,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -75,7 +70,13 @@ pub enum WsEvent {
     // 改票
     CHANGED,
     // 广播数据：传递数据到其他节点
-    BROADCAST
+    BROADCAST,
+    // 已经选出leader
+    LEADER,
+    // 重置数据
+    RESET,
+    // 节点内部通讯
+    PRIVATE,
 }
 
 // #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -102,25 +103,39 @@ pub enum WsDataStatus {
     // 其他节点需要同步数据
     SEND,
     // 投票周期一致
-    NONTODO
+    NONTODO,
 }
 
 impl WsResponse {
-
     pub fn from_str<'a>(s: &'a str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(s)
     }
 
-    pub fn ok(event: WsEvent, mail_box: String, state: Option<State>) -> Self {
-        WsResponse { event, status_code: WsStatusCode::SUCCESS, mail_box, state }
+    pub fn ok(event: WsEvent, message: String, vcd: Option<VCData>) -> Self {
+        WsResponse {
+            event,
+            status_code: WsStatusCode::SUCCESS,
+            message,
+            vcd,
+        }
     }
 
-    pub fn failed(event: WsEvent, mail_box: String, state: Option<State>) -> Self {
-        WsResponse { event, status_code: WsStatusCode::FAILED, mail_box, state }
+    pub fn failed(event: WsEvent, message: String, vcd: Option<VCData>) -> Self {
+        WsResponse {
+            event,
+            status_code: WsStatusCode::FAILED,
+            message,
+            vcd,
+        }
     }
 
-    pub fn error(event: WsEvent, mail_box: String, state: Option<State>) -> Self {
-        WsResponse { event, status_code: WsStatusCode::ERROR, mail_box, state }
+    pub fn error(event: WsEvent, message: String, vcd: Option<VCData>) -> Self {
+        WsResponse {
+            event,
+            status_code: WsStatusCode::ERROR,
+            message,
+            vcd,
+        }
     }
 
     pub fn to_string(&self) -> String {
@@ -135,7 +150,6 @@ impl WsResponse {
     // pub fn new() -> Self {
     //     WsResponse { event: WsEvent::UNKNOWN, status_code: WsStatusCode::SUCCESS, mail_box: String::new(), state: None }
     // }
-
 }
 
 // impl Attribute {

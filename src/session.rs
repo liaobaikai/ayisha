@@ -200,47 +200,48 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                         //     session_id: self.session_id,
                         //     data: v.data.clone()
                         // });
-                        let data = server::Join {
-                            session_id: self.session_id,
-                            state: v.state.clone()
-                        };
+                        // let data = server::Join {
+                        //     session_id: self.session_id,
+                        //     state: v.state.clone()
+                        // };
 
-                        // 同步发送消息并响应
-                        self.addr.send(data).into_actor(self).then(move |res, _, ctx| {
-                            if let Ok(join) = res {
-                                // 0 => 本机刚恢复,投票周期比加入的节点要小,本机需要同步数据
-                                // 1 => 本机投票周期比加入节点的要大,加入节点需要同步数据
-                                // 2 => 投票周期一致
-                                // let mut data = v.data.clone();
-                                // if level == 0 {
-                                //     data.status = WsDataStatus::RECV;
-                                // } else if level == 1 {
-                                //     data.status = WsDataStatus::SEND;
-                                // } else {
-                                //     data.status = WsDataStatus::YES;
-                                // }
-                                ctx.text(WsResponse::ok(v.event, "Joined".to_owned(), Some(join.state)).to_string());
-                            } else {
-                                println!("Something is wrong")
-                            }
-                            fut::ready(())
-                        }).wait(ctx);
+                        // // 同步发送消息并响应
+                        // self.addr.send(data).into_actor(self).then(move |res, _, ctx| {
+                        //     if let Ok(join) = res {
+                        //         // 0 => 本机刚恢复,投票周期比加入的节点要小,本机需要同步数据
+                        //         // 1 => 本机投票周期比加入节点的要大,加入节点需要同步数据
+                        //         // 2 => 投票周期一致
+                        //         // let mut data = v.data.clone();
+                        //         // if level == 0 {
+                        //         //     data.status = WsDataStatus::RECV;
+                        //         // } else if level == 1 {
+                        //         //     data.status = WsDataStatus::SEND;
+                        //         // } else {
+                        //         //     data.status = WsDataStatus::YES;
+                        //         // }
+                        //         ctx.text(WsResponse::ok(v.event, "Joined".to_owned(), Some(join.state)).to_string());
+                        //     } else {
+                        //         println!("Something is wrong")
+                        //     }
+                        //     fut::ready(())
+                        // }).wait(ctx);
                         
                     }
 
-                    WsEvent::COPY => {
-                        // 数据同步，一般加入到集群中下一步就是数据同步了
-                        // 将数据同步到其他会话
-
-                        // 加入到集群中
-                        // 不等待响应
-                        self.addr.do_send(server::Copy {
+                    WsEvent::RESET => {
+                        // 重置 SGA 数据
+                        self.addr.do_send(server::Reset {
                             session_id: self.session_id,
-                            state: v.state.clone()
                         });
+                    }
 
-                        ctx.text(WsResponse::ok(v.event, "Copy".to_owned(), Some(v.state)).to_string());
-
+                    WsEvent::PRIVATE => {
+                        // 重置 SGA 数据
+                        self.addr.do_send(server::Private {
+                            session_id: self.session_id,
+                            namespace: self.namespace.clone(),
+                            vcd: v.vcd.clone(),
+                        });
                     }
 
                     WsEvent::VOTE => {
@@ -257,20 +258,32 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                         // ctx.text(WsResponse::success(v.event, "Election".to_owned(), Some(v.state)).to_string());
                         let data = server::Vote {
                             session_id: self.session_id,
-                            state: v.state.clone(),
-                            ok: false,
+                            vcd: v.vcd.clone(),
                             timeout: false,
-                            namespace: self.namespace.clone()
+                            namespace: self.namespace.clone(),
+                            result: server::VoteResult::UNDEFINED,
                         };
                         self.addr.send(data).into_actor(self).then(move |res, _, ctx| {
                             if let Ok(vote) = res {
-                                let state = Some(vote.state.clone());
-                                if vote.ok {
-                                    // 投票成功
-                                    ctx.text(WsResponse::ok(v.event, "Voted".to_owned(), state).to_string());
-                                } else {
-                                    // 投票失败，票数转移给其他候选人
-                                    ctx.text(WsResponse::failed(v.event, "Changed Vote".to_owned(), state).to_string());
+                                let vcd = Some(vote.vcd.clone());
+                                match vote.result {
+                                    server::VoteResult::UNDEFINED => {},
+                                    server::VoteResult::LEADER => {
+                                        // 刚加入的节点,leader已经选出了,无需参选
+                                        ctx.text(WsResponse::ok(WsEvent::LEADER, "Non-Voted".to_owned(), vcd).to_string());
+                                    },
+                                    server::VoteResult::SUCCESS => {
+                                        // 投票成功
+                                        ctx.text(WsResponse::ok(v.event, "Voted".to_owned(), vcd).to_string());
+                                    },
+                                    server::VoteResult::CHANGE => {
+                                        // 投票失败，票数转移给其他候选人
+                                        ctx.text(WsResponse::failed(v.event, "Changed Vote".to_owned(), vcd).to_string());
+                                    },
+                                    server::VoteResult::ABANDON => {
+                                        // 投票失败，票数转移给其他候选人
+                                        ctx.text(WsResponse::failed(v.event, "Abandon Vote".to_owned(), vcd).to_string());
+                                    },
                                 }
                             } else {
                                 println!("Something is wrong")
@@ -282,7 +295,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
 
                     _ => {
                         // 未适配的类型
-                        ctx.text(WsResponse::failed(v.event, "Unsupported event".to_owned(), Some(v.state)).to_string());
+                        ctx.text(WsResponse::failed(v.event, "Unsupported event".to_owned(), Some(v.vcd)).to_string());
                         return;
                     }
                 }

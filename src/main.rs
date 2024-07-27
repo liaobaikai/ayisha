@@ -14,7 +14,6 @@ mod auth;
 mod vot;
 mod config;
 mod ws;
-// mod pom;
 mod shared;
 
 
@@ -147,9 +146,9 @@ async fn main() -> std::io::Result<()> {
         for server in config::get_nodes() {
             // let node_id = format!("{}", node.id);
             // let server_id = server.id;
-            if server.id == config::get_server_id() {
-                continue;
-            }
+            // if server.id == config::get_server_id() {
+            //     continue;
+            // }
             // if server_id as usize == local_id {
             //     continue;
             // }

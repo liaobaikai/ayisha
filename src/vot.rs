@@ -7,7 +7,7 @@ use tokio::{select, sync::mpsc::{self}, time::{self}};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::CancellationToken;
 
-use crate::{config, servlet, shared::{self, State, Vote}, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
+use crate::{config, servlet, shared::{self, VTo}, ws::{self, WsEvent, WsRequest, WsResponse, WsStatusCode}};
 
 pub struct VoteHandler {
     addr: String,
@@ -17,12 +17,10 @@ pub struct VoteHandler {
 impl VoteHandler {
 
     pub fn new(addr: String, port: u16) -> Self {
-
         VoteHandler {
             addr,
             port,
         }
-
     }
 
     // 启动
@@ -34,24 +32,11 @@ impl VoteHandler {
         let (reverse_tx, _reverse_rx) = mpsc::unbounded_channel::<WsResponse>();
         let mut rx = UnboundedReceiverStream::new(_rx);
         let mut reverse_rx = UnboundedReceiverStream::new(_reverse_rx);
-        // let tx1 = tx.clone();
 
         let token = CancellationToken::new();
         let cloned_token = token.clone();
-        // let inner_id = String::from(id);
-        // let server_id = format!("{}", self.server_id);
-        // let target_id = Arc::new(format!("{}", self.server_id));
-        // let cloned_target_id = Arc::clone(&target_id);
         let cloned_server_id = &server_id.clone();
-        // let inner_id2 = String::from(id);
-        
-        // let mut c_attr = self.pom.clone();
-        // let mut pom = self.pom.clone();
-        // pom.v_state.id = self.server_id;
-        // let voter_id = pom.v_state.id;
-        // let cloned_voter_id = voter_id.clone();
         let myid = config::get_server_id();
-        
         
         // 启动定时发送任务
         let send_handle = tokio::spawn(async move {
@@ -65,18 +50,9 @@ impl VoteHandler {
             
             // 加入后进入投票环节
             let mut event = WsEvent::VOTE;
-            // 已经过了投票环节
-            // if pom.v_state.poll == 0 {
-            //     event = WsEvent::JOIN;
-            // }
-            // if server_id == voter_id {
-            //     // 只需要同步数据即可。
-            //     // 从磁盘中将数据写入内存中
-            //     // Voter -> Candidate
-            //     // 主动同步数据
-            //     event = WsEvent::COPY;
-            // }
-
+            if myid == server_id {
+                event = WsEvent::PRIVATE;
+            }
             let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
 
             loop {
@@ -86,64 +62,18 @@ impl VoteHandler {
                         break;
                     }
                     Some(v) = reverse_rx.next() => {
-                        // v => WsResponse
-                        // log::debug!("[{}] - [{}] - RRX recv: {:?}", &voter_id, &server_id, v);
                         // 数据分析
                         match v.event {
+                            ws::WsEvent::RESET => { }
+                            ws::WsEvent::PRIVATE => { }
                             ws::WsEvent::JOIN => {
                                 // 进入数据同步
-                                if let Some(_state) = v.state {
-                                    // c_attr.poll = data.poll;
-                                    
-
-                                    // match state.status {
-                                    //     WsDataStatus::NONTODO => {
-                                    //         continue
-                                    //     }
-
-                                    //     WsDataStatus::RECV | WsDataStatus::SEND => {
-                                    //         // 进入数据同步环节
-                                    //         // c_attr.event = ws::WsEvent::COPY;
-                                    //         // let src = c_attr.to_bytestr();
-                                    //         // if let Err(e) = tx.send(src) {
-                                    //         //     log::error!("[{}] - - TX send failed, cause: {}", &inner_id, e);
-                                    //         //     break;
-                                    //         // }
-                                    //     }
-                                    // }
+                                if let Some(_vcd) = v.vcd {
                                 }
                             }
                             ws::WsEvent::COPY => {
                                 // 其他节点同步数据到本节点
-                                if let Some(_state) = v.state {
-                                    // if server_id == voter_id {
-                                    //     // 同步完成
-                                    //     log::debug!("[{}] - [{}] - Copy with candidate done, nothing to do", &voter_id, &server_id);
-                                    //     // 刷新到本地
-                                    //     pom.v_flush();
-
-                                    //     // if let Ok(mut g) = POLL_MUTEX.try_lock() {
-                                    //     //     *g += 1;
-                                    //     // }
-                  
-
-                                    // }
-                                    // match data.status {
-                                    //     WsDataStatus::NONTODO => {
-                                    //         continue
-                                    //     }
-
-                                    //     WsDataStatus::RECV => {
-                                    //         // 数据需要从节点节点同步到本节点
-                                    //         // local_request.event = WsEvent::COPY;
-                                    //         log::debug!("[{}] ### RECV data:: {:?}", &server_id, data);
-
-                                    //     }
-
-                                    //     WsDataStatus::SEND => {
-                                    //         // 数据同步到其他节点
-                                    //     }
-                                    // }
+                                if let Some(_vcd) = v.vcd {
                                 }
                             }
                             ws::WsEvent::VOTE => {
@@ -151,18 +81,16 @@ impl VoteHandler {
                                 match v.status_code {
                                     // 投票成功
                                     WsStatusCode::SUCCESS => {
-                                        if let Some(_) = v.state {
+                                        if let Some(vcd) = v.vcd {
                                             log::debug!("[{}] - [{}] - Voting succcess, change event?", &myid, &server_id);
                                             let mut sga = lock.lock();
-                                            let vote = Vote {
-                                                from_id: myid,
-                                                to_id: server_id,
-                                                poll: sga.poll,
-                                            };
-                                            // 我的所有票数置为0
-                                            sga.poll = 0;
+                                            // 我选择弃权
+                                            sga.released = true;
                                             // 设置我的票数去向
-                                            sga.poll_to = Some(vote);
+                                            sga.poll_to = Some(VTo::new(myid, sga.vcd.poll));
+                                            // 返回最终的票数，正常 vcd.poll=0
+                                            sga.vcd.poll = vcd.poll;
+                                            // 通知其他等待的线程
                                             cvar.notify_one();
                                         }
                                     }
@@ -170,20 +98,28 @@ impl VoteHandler {
                                         // 投票失败
                                         // 本候选人获取其他候选人的票数
                                         log::debug!("[{}] - [{}] - Voting Changed, data: `{:?}`", &myid, &server_id, v);
-                                        if let Some(state) = v.state {
-                                            let mut sga = lock.lock();
-                                            // 恢复投票
-                                            sga.poll = state.poll;
-                                            let mut poll = state.poll;
-                                            // 添加我的支持者
-                                            for pf in state.poll_from {
-                                                sga.poll += pf.poll;
-                                                poll += pf.poll;
-                                                sga.poll_from(pf);
+                                        if let Some(vcd) = v.vcd {
+                                            if vcd.poll == 0 {
+                                                // 状态为 released = true
+                                                log::debug!("[{}] - [{}] - released=true, Nothing to do", &myid, &server_id);
+                                                return ;
                                             }
-                                            log::debug!("[{}] - [{}] - Voter.SGA:FAILED: {:?}", &myid, &server_id, sga);
+
+                                            let mut sga = lock.lock();
+                                            // 返回最终的票数
+                                            sga.vcd.poll = vcd.poll;
+
+                                            log::debug!("[{}] - [{}] - Voter.SGA:FAILED00000: {:?}", &myid, &server_id, sga);
+                                            // 获得的票数
+                                            let mut acquire_poll = 0;
+                                            // 添加我的支持者
+                                            for pf in vcd.poll_from {
+                                                acquire_poll += sga.poll_from(pf);
+                                            }
+
+                                            log::debug!("[{}] - [{}] - Voter.SGA:FAILED111111: {:?}", &myid, &server_id, sga);
                                             cvar.notify_one();
-                                            log::debug!("[{}] - [{}] - Voting confirmed, received votes {} from {}, total votes {} ", &myid, &server_id, poll, &server_id, sga.poll);
+                                            log::debug!("[{}] - [{}] - Voting confirmed, acquired votes {} from {}, total votes {} ", &myid, &server_id, acquire_poll, &server_id, sga.vcd.poll);
                                         }
                                     }
 
@@ -194,38 +130,26 @@ impl VoteHandler {
 
                             }
 
-                            ws::WsEvent::CHANGED => {
-                                // 投票转移
-                                // match v.status_code {
-                                //     WsStatusCode::SUCCESS => {
-                                //         // 投票已提交
-                                //         pom.v_state.poll = 0;
-                                //         // 修改事件类型
-                                //         event = WsEvent::JOIN;
-                                //         // 刷盘
-                                //         pom.v_flush();
+                            ws::WsEvent::CHANGED => {}
+                            ws::WsEvent::BROADCAST => {}
 
-                                //     }
-                                //     WsStatusCode::FAILED=> {
-                                //         // 投票失败
-                                //         // 获取所有票数，投给其他候选人
-
-                                //     }
-
-                                //     // ERROR
-                                //     _ => {}
-                                    
-                                // }
-
-                            }
-
-                            ws::WsEvent::BROADCAST => {
-                                if let Some(s) = v.state {
-                                    // 更新 poll_to
-                                    if s.myid == myid {
-                                        log::debug!("SKIP::BROADCAST::::{:?}", s);
-                                    } else {
-                                        log::debug!("BROADCAST::::{:?}", s);
+                            ws::WsEvent::LEADER => {
+                                if let Some(vcd) = v.vcd {
+                                    // 收到广播数据
+                                    if vcd.leader == myid {
+                                        return ;
+                                    }
+                                    let mut sga = lock.lock();
+                                    match sga.status {
+                                        shared::Status::LOOKING => { 
+                                            sga.vcd.leader = vcd.leader;
+                                            // 同步投票周期
+                                            sga.vcd.term = vcd.term;
+                                            // 其他节点为FOLLOWING
+                                            sga.status = shared::Status::FOLLOWING;
+                                            log::debug!("[{myid}] - [{server_id}] - ws::WsEvent::LEADER: {:?}", sga);
+                                        }
+                                        _ => {}
                                     }
                                 }
                             }
@@ -239,39 +163,49 @@ impl VoteHandler {
 
                         // 没有票数的时候，就等待
                         let mut sga = lock.lock();
+                        // 没有leader
+                        match sga.status {
+                            shared::Status::LOOKING => { 
+                                log::debug!("[{myid}] - [{server_id}] - Voter.SGA:tick: {:?}", sga);
+                                // 如果已经放弃候选人的角色，则后续无需参与投票
+                                if sga.released {
+                                    log::debug!("[{myid}] - [{server_id}] - Current abandon, sleep for 10 seconds to continue");
+                                    continue;
+                                }
 
-                        log::debug!("[{myid}] - [{server_id}] - Voter.SGA:tick: {:?}", sga);
+                                // 投票来源谁？无需重复投票
+                                if sga.is_poll_from(&server_id) {
+                                    log::debug!("[{myid}] - [{server_id}] - Voted from {server_id}, Skip Vote, sleep for 10 seconds to continue");
+                                    continue;
+                                }
+                                // 我投票给谁？无需重复投票
+                                if sga.is_poll_to(&server_id) {
+                                    log::debug!("[{myid}] - [{server_id}] - Voted to {server_id}, Skip Vote, sleep for 10 seconds to continue");
+                                    continue;
+                                }
 
-                        // 投票来源谁？无需重复投票
-                        if sga.is_poll_from(&server_id).is_some() {
-                            log::debug!("[{myid}] - [{server_id}] - Voted from {server_id}, Skip Vote, sleep for 10 seconds to continue");
-                            continue;
-                        }
-                        // 我投票给谁？无需重复投票
-                        if sga.is_poll_to(&server_id).is_some() {
-                            log::debug!("[{myid}] - [{server_id}] - Voted to {server_id}, Skip Vote, sleep for 10 seconds to continue");
-                            continue;
-                        }
+                                if sga.vcd.poll == 0 {
+                                    log::debug!("[{myid}] - [{server_id}] - sga.poll == 0, cvar.wait...");
+                                    // 10秒后超时，不等待
+                                    if cvar.wait_until(&mut sga, Instant::now() + Duration::from_secs(10)).timed_out() {
+                                        log::debug!("[{myid}] - [{server_id}] - sga.poll == 0, cvar.wait...timeout...");
+                                        continue;
+                                    }
+                                }
 
-                        if sga.poll == 0 {
-                            log::debug!("[{myid}] - [{server_id}] - sga.poll == 0, cvar.wait...");
-                            // 10秒后超时，不等待
-                            if cvar.wait_until(&mut sga, Instant::now() + Duration::from_secs(10)).timed_out() {
-                                log::debug!("[{myid}] - [{server_id}] - sga.poll == 0, cvar.wait...timeout...");
-                                continue;
+                             }
+                            _ => {
+                                // 处理COPY
+                                event = ws::WsEvent::COPY;
                             }
                         }
 
                         // 连接123，数据重装，将票数来源
                         let src = WsRequest{
                             event: event.clone(),
-                            state: State::new(&sga)
+                            vcd: sga.get_vcd()
                         }.to_bytestr();
                         
-                        // 票数设置为 0
-                        sga.poll = 0;
-
-                        // log::debug!("[{myid}] - [{server_id}] - TX send: `{}`", src);
                         if let Err(e) = tx.send(src) {
                             log::error!("[{myid}] - [{server_id}] - TX send failed, cause: {e}");
                             break;
@@ -323,7 +257,7 @@ impl VoteHandler {
                                 WsStatusCode::SUCCESS | WsStatusCode::FAILED=> {
                                 }
                                 WsStatusCode::ERROR => {
-                                    log::error!("[{myid}] - [{cloned_server_id}] - The server {cloned_server_id} returned an error: {}", v.mail_box);
+                                    log::error!("[{myid}] - [{cloned_server_id}] - The server {cloned_server_id} returned an error: {}", v.message);
                                     return false
                                 }
                             }
@@ -364,6 +298,10 @@ impl VoteHandler {
                         break;
                     }
                 },
+
+                else => {
+                    // 未匹配
+                }
 
             }
 
