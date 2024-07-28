@@ -1,96 +1,32 @@
-use std::{process::exit, sync::{atomic::{AtomicUsize, Ordering}, Arc}, thread, time::Duration};
-
 use actix::*;
-use actix_web::{ middleware::Logger, web, App, HttpServer
-};
-// use parking_lot::{Condvar, Mutex};
-// use db::Node;
-
-mod server;
-mod session;
-mod router;
-mod servlet;
+use actix_web::{middleware::Logger, web, App, HttpServer};
+use std::time::Duration;
 mod auth;
-mod vot;
 mod config;
-mod ws;
+mod router;
+mod server;
+mod servlet;
+mod session;
 mod shared;
-
-
+mod vot;
+mod ws;
 
 // https://github.com/actix/examples/blob/master/websockets/chat/src/main.rs
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-
-    // let pair = Arc::new((Mutex::new(false), Condvar::new()));
-    // let data1 = server::GLOBAL_STATE_DATA.clone();
-    /*
-    let mut sga = ShareGlobalArea::new();
-    let mut flag = false;
-
-    let pair2 = shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
-    thread::spawn(move|| {
-        let &(ref lock, ref cvar) = &*pair2;
-        println!("inner waiting lock");
-        let mut data = lock.lock();
-        println!("inner acquire lock");
-        println!("inner data.poll=>{}", data.poll);
-        sga.poll = 1;
-        // 修改数据
-        *data = sga;
-        let mut started = data.lock.lock();
-        *started = true;
-
-        cvar.notify_one();
-        println!("cvar.notify_one");
-    });
-    // 
-    {
-        println!("wait for the thread to start up");
-        let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
-        println!("outer waiting lock");
-        let mut data = lock.lock();
-        println!("outer acquire lock");
-        // 修改数据
-        let mut sga2 = sga.clone();
-        sga2.poll += 200;
-        *data = sga2;
-
-        let started = data.lock.lock();
-
-        // 不符合条件，则等待
-        while !*started {
-            println!("cvar wait");
-            cvar.wait(&mut data);
-            println!("data.poll=>{}", data.poll);
-        }
-        
-    }
-
-    */
-
-    // thread::sleep(Duration::from_secs(10));
-
-    // let pair3 = shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
-    // thread::spawn(move|| {
-    //     let &(ref lock, ref cvar) = &*pair3;
-    //     println!("inner2 waiting lock");
-    //     let mut state = lock.lock();
-    //     println!("inner2 acquire lock");
-    //     state.poll += 2;
-    //     state.lock = true;
-    //     cvar.notify_one();
-    //     println!("inner2 cvar.notify_one...");
-    // });
-
-
-    // exit(0);
-
     // 查询本地数据库的所有配置是否有效
     log4rs::init_file("log4rs.yml", Default::default()).unwrap();
 
-    log::info!("[{}] - - Server is listen on 0.0.0.0:{}", config::get_server_id(), config::get_server_port());
-    log::info!("[{}] - - Server will be running {} workers", config::get_server_id(), config::get_server_worker());
+    log::info!(
+        "[{}] - - Server is listen on 0.0.0.0:{}",
+        config::get_server_id(),
+        config::get_server_port()
+    );
+    log::info!(
+        "[{}] - - Server will be running {} workers",
+        config::get_server_id(),
+        config::get_server_worker()
+    );
 
     // let app_state = Arc::new(AtomicUsize::new(0));
 
@@ -107,8 +43,12 @@ async fn main() -> std::io::Result<()> {
             .configure(router::config)
             // .app_data(web::Data::from(app_state.clone()))
             .app_data(web::Data::new(server.clone()))
-            .wrap(Logger::new("%{r}a - - \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %t in %Ts").log_target("data"))
+            .wrap(
+                Logger::new("%{r}a - - \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %t in %Ts")
+                    .log_target("data"),
+            )
     })
+    .disable_signals()
     .workers(config::get_server_worker())
     .bind(("0.0.0.0", config::get_server_port()))?
     .run();
@@ -116,7 +56,6 @@ async fn main() -> std::io::Result<()> {
     let mut voter_handles = Vec::new();
     // 是否需要启动客户端
     if !config::get_client_singleton() {
-
         // 读取本机有多少投票
         // 预设为 1 票
         // let votes = app_state.clone();
@@ -154,33 +93,39 @@ async fn main() -> std::io::Result<()> {
             // }
             let server_addr = server.host.unwrap_or(String::from("127.0.0.1"));
             let server_port = server.port.unwrap_or(config::DEFAULT_PORT);
-            
-            let voter_handle = actix::spawn(async move {
 
+            let voter_handle = actix::spawn(async move {
                 let vh = vot::VoteHandler::new(server_addr, server_port);
                 loop {
-                    let connect_failed = vh.start(server.id, &config::get_client_app_key(), &config::get_client_app_secret()).await;
+                    let connect_failed = vh
+                        .start(
+                            server.id,
+                            &config::get_client_app_key(),
+                            &config::get_client_app_secret(),
+                        )
+                        .await;
                     if connect_failed {
                         log::info!("[{}] - [{}] - Connection not established, wait for {} seconds to retry again", myid, server.id, config::get_client_connect_retry());
                     } else {
                         log::info!("[{}] - [{}] - The connection has been disconnected, wait for {} seconds to reconnect", myid, server.id, config::get_client_connect_retry());
                     }
-                    tokio::time::sleep(Duration::from_secs(config::get_client_connect_retry() as u64)).await;
+                    tokio::time::sleep(Duration::from_secs(
+                        config::get_client_connect_retry() as u64
+                    ))
+                    .await;
                 }
             });
 
             voter_handles.push(voter_handle);
-
         }
     }
-    
+
     http_server.await.unwrap();
     for handle in voter_handles {
         handle.await.unwrap();
     }
-    
+
     println!("OK.");
 
-    
     Ok(())
 }

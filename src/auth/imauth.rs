@@ -1,11 +1,10 @@
-use std::{net::{IpAddr, Ipv4Addr, Ipv6Addr}, str::FromStr};
-
+use crate::config;
 use ipnetwork::IpNetwork;
 use serde::Deserialize;
-
-use crate::config;
-
-// use crate::db;
+use std::{
+    net::{IpAddr, Ipv4Addr, Ipv6Addr},
+    str::FromStr,
+};
 
 #[derive(Deserialize, Debug)]
 pub struct User {
@@ -17,28 +16,22 @@ pub struct User {
 pub struct IMAuth;
 
 impl IMAuth {
-
     pub fn new() -> Self {
-        IMAuth {
-            
-        }
+        IMAuth {}
     }
 
     // 检查权限
     // 考虑添加跳过鉴权表功能
     pub fn authenticate(&self, user: &User) -> bool {
-
         let ip: IpAddr = match Ipv4Addr::from_str(&user.ip) {
             Ok(ip) => IpAddr::V4(ip),
-            Err(_) => {
-                match Ipv6Addr::from_str(&user.ip) {
-                    Ok(ipv6) => IpAddr::V6(ipv6),
-                    Err(_) => {
-                        log::error!("- - - invalid client address: {}", &user.ip);
-                        return false;
-                    }
-                 }
-            }
+            Err(_) => match Ipv6Addr::from_str(&user.ip) {
+                Ok(ipv6) => IpAddr::V6(ipv6),
+                Err(_) => {
+                    log::error!("- - - invalid client address: {}", &user.ip);
+                    return false;
+                }
+            },
         };
 
         let idents = config::HostBasedAuth::new().match_ident(&user.app_key, &user.app_secret);
@@ -64,17 +57,18 @@ impl IMAuth {
                     // 包含，放通
                     // 未指定，则全部 IP 放通
                     // 双方都是回环地址，则放通
-                    let mut is_unspecified = ip.is_ipv4() & net.is_ipv4() & net.network().is_unspecified();
+                    let mut is_unspecified =
+                        ip.is_ipv4() & net.is_ipv4() & net.network().is_unspecified();
                     is_unspecified |= ip.is_ipv6() & net.is_ipv6() & net.network().is_unspecified();
 
-                    let mut is_loopback = ip.is_ipv4() & net.is_ipv4() & net.network().is_loopback();
+                    let mut is_loopback =
+                        ip.is_ipv4() & net.is_ipv4() & net.network().is_loopback();
                     is_loopback |= ip.is_ipv6() & net.is_ipv6() & net.network().is_loopback();
 
                     log::debug!("[{}] - [{}] - hba_ident: Unspecified: {}, Address Contains IP: {}, Address & IP is Loopback: {}", ip, net, is_unspecified, net.contains(ip), is_loopback, );
-                    
+
                     is_unspecified | net.contains(ip) | is_loopback
-                    
-                },
+                }
                 Err(e) => {
                     log::error!("[{}] - - invalid hba_ident.homl address, cause: {}", ip, e);
                     false
@@ -95,10 +89,7 @@ impl IMAuth {
             log::warn!("{} - - Access denied for ADDRESS", user.ip);
             return false;
         }
-    
+
         true
     }
-    
 }
-
-

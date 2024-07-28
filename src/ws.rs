@@ -1,7 +1,6 @@
+use crate::shared::VCData;
 use bytestring::ByteString;
 use serde::{Deserialize, Serialize};
-
-use crate::shared::VCData;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WsRequest {
@@ -42,8 +41,8 @@ impl WsRequest {
 pub struct WsResponse {
     // 事件
     pub event: WsEvent,
-    // 状态码
-    pub status_code: WsStatusCode,
+    // 结果
+    pub result: WsResult,
     // 消息
     pub message: String,
     // json数据
@@ -51,32 +50,41 @@ pub struct WsResponse {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum WsStatusCode {
+pub enum WsResult {
     // 处理成功
-    SUCCESS,
+    Ok,
     // 指的是处理失败
-    FAILED,
+    Failed,
     // 指的是处理过程有发生异常
-    ERROR,
+    Error,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum WsEvent {
-    UNKNOWN,
-    JOIN,
-    COPY,
+    // 未知的
+    Unknown,
+    // 加入
+    Join,
+    // 同步数据
+    Sync,
     // 投票
-    VOTE,
+    Vote,
     // 改票
-    CHANGED,
+    Changed,
     // 广播数据：传递数据到其他节点
-    BROADCAST,
+    Broadcast,
     // 已经选出leader
-    LEADER,
+    Leader,
+    // 广播leader
+    // BroadcastAfterElectionLeader,
     // 重置数据
-    RESET,
+    Reset,
+    // leader下线
+    LeaderOffline,
+    // leader下线
+    Offline,
     // 节点内部通讯
-    PRIVATE,
+    Heartbeat,
 }
 
 // #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -114,7 +122,7 @@ impl WsResponse {
     pub fn ok(event: WsEvent, message: String, vcd: Option<VCData>) -> Self {
         WsResponse {
             event,
-            status_code: WsStatusCode::SUCCESS,
+            result: WsResult::Ok,
             message,
             vcd,
         }
@@ -123,7 +131,7 @@ impl WsResponse {
     pub fn failed(event: WsEvent, message: String, vcd: Option<VCData>) -> Self {
         WsResponse {
             event,
-            status_code: WsStatusCode::FAILED,
+            result: WsResult::Failed,
             message,
             vcd,
         }
@@ -132,7 +140,7 @@ impl WsResponse {
     pub fn error(event: WsEvent, message: String, vcd: Option<VCData>) -> Self {
         WsResponse {
             event,
-            status_code: WsStatusCode::ERROR,
+            result: WsResult::Error,
             message,
             vcd,
         }

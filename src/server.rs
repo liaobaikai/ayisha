@@ -1,22 +1,11 @@
-use actix::prelude::*;
-use parking_lot::{Condvar, Mutex};
-use rand::{rngs::ThreadRng, Rng};
-use std::{
-    clone,
-    collections::{HashMap, HashSet},
-    net::IpAddr,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-    time::{Duration, Instant},
-};
-
 use crate::{
     config,
-    shared::{self, VCData, VFrom, VTo},
-    ws::{self, WsEvent, WsRequest, WsResponse},
+    shared::{self, VCData, VFrom},
+    ws::{WsEvent, WsResponse},
 };
+use actix::prelude::*;
+use rand::{rngs::ThreadRng, Rng};
+use std::{collections::HashMap, net::IpAddr};
 // https://github.com/actix/examples/blob/master/websockets/chat/src/server.rs
 // https://cloud.tencent.com/developer/article/1756850
 
@@ -36,14 +25,16 @@ pub struct Connect {
     pub voter_id: usize,
     pub addr: Recipient<Message>,
     pub ip: IpAddr,
-    pub namespace: String,
 }
 
 /// Session is disconnected
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Disconnect {
-    pub id: usize,
+    pub session_id: usize,
+    pub myid: usize,
+    pub voter_id: usize,
+    // pub namespace: String,
     /// Is closed connection?
     pub closed: bool,
     pub ip: IpAddr,
@@ -87,9 +78,9 @@ pub struct Reset {
 // 节点内部通讯
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct Private {
+pub struct Heartbeat {
     pub session_id: usize,
-    pub namespace: String,
+    // pub namespace: String,
     pub vcd: VCData,
 }
 
@@ -105,7 +96,7 @@ pub struct Vote {
     // 锁等待超时
     pub timeout: bool,
     // 命名空间
-    pub namespace: String,
+    // pub namespace: String,
     //
     pub result: VoteResult,
 }
@@ -113,15 +104,15 @@ pub struct Vote {
 #[derive(Debug)]
 pub enum VoteResult {
     // 未定义的
-    UNDEFINED,
+    Undefined,
     // 投票成功
-    SUCCESS,
+    Ok,
     // 投票转换
-    CHANGE,
+    Change,
     // 投票拒绝，当前的角色不接受投票
-    ABANDON,
+    Abandon,
     // 刚加入的节点,已经有leader了
-    LEADER,
+    Leader,
 }
 
 /// `ChatServer` manages chat rooms and responsible for coordinating chat session.
@@ -132,67 +123,37 @@ pub struct ChatServer {
     // SESSION_ID, ADDR
     sessions: HashMap<usize, Recipient<Message>>,
     // SESSION_ID, UID
-    // session_map: HashMap<usize, usize>,
-    namespaces: HashMap<String, HashSet<usize>>,
-    // visitor_count: Arc<AtomicUsize>,
+    // namespaces: HashMap<String, HashSet<usize>>,
     rng: ThreadRng,
-    // pom: PoManager,
-
-    // pair: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)>,
-
-    // 投票来源: voter_id, poll (投票人 ID，票数)
-    // poll_from: HashMap<usize, usize>,
-    // 候选人状态信息
-    // c_state: State,
-    // 本地连接
-    // local_session_list: Vec<usize>,
-    // (投票人 ID，票数)
+    // VOTER_ID, POLL
     vote_from: HashMap<usize, usize>,
+    // SESSION_ID, VOTER_ID
+    session_keys: HashMap<usize, usize>,
 }
 
 impl ChatServer {
-    // static GLOBAL_STATE_MUTEX_PAIR: Arc<(parking_lot::lock_api::Mutex<parking_lot::RawMutex, bool>, Condvar)> = Arc::new((Mutex::new(false), Condvar::new()));
     pub fn new() -> ChatServer {
-        // default namespaces
-        // let namespaces = HashMap::new();
-        // namespaces.insert(ns.clone(), HashSet::new());
-        // let pair = Arc::new((Mutex::new(false), Condvar::new()));
-        // let pair2 = GLOBAL_STATE_MUTEX_PAIR.clone();
-        // let &(ref lock, ref cvar) = &*pair2;
-
         ChatServer {
             sessions: HashMap::new(),
-            // session_map: HashMap::new(),
-            namespaces: HashMap::new(),
-            // visitor_count,
+            // namespaces: HashMap::new(),
             rng: rand::thread_rng(),
-            // pair,
-            // pom,
-            // poll_from: HashMap::new(),
-            // c_state: State::new(),
-            // local_session_list: Vec::new()
             vote_from: HashMap::new(),
+            session_keys: HashMap::new(),
         }
     }
 }
 
 impl ChatServer {
     /// Send message to all users in the cluster
-    fn send_message(&self, namespace: &str, message: &str, skip_sid: usize) {
-        if let Some(sessions) = self.namespaces.get(namespace) {
-            for sid in sessions {
-                if *sid != skip_sid {
-                    if let Some(addr) = self.sessions.get(sid) {
-                        addr.do_send(Message(message.to_owned()));
-                    }
-                }
-            }
-        }
-    }
+    // fn send_message(&self, namespace: &str, message: &str, skip_sid: usize) {
+    //     for (sid, addr) in self.sessions {
+    //         addr.do_send(Message(message.to_owned()));
+    //     }
+    // }
 
     // 选举领导者
     // 超过超过半数才开始选举
-    fn electing_leader(&mut self, mut msg: Private) {
+    fn electing_leader(&mut self, mut msg: Heartbeat) {
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let mut sga = lock.lock();
         if sga.released {
@@ -200,70 +161,74 @@ impl ChatServer {
             return;
         }
         // 有状态则不用选举
-        match sga.status {
-            shared::Status::LEADING | shared::Status::FOLLOWING => return,
-            _ => {}
+        if sga.is_not_looking() {
+            return;
         }
-        // {
-        //     for v in sga.vcd.poll_from.iter() {
-        //         if !self.vote_from.contains_key(&v.from_id) {
-        //             self.vote_from.insert(v.from_id, v.poll);
-        //         }
-        //     }
-        // }
+
+        // 重新选举 term > 0
+        // 首次选举 term = 0
+        if sga.vcd.term > 0 {
+            // 重新选举
+            self.vote_from = HashMap::new();
+            log::debug!(
+                "[{}] - [{}] - Reset vote_from...",
+                sga.vcd.myid,
+                sga.vcd.myid
+            );
+        }
+
         ///////////////////////////////////////////////////////////////////
         // 选举开始
         ///////////////////////////////////////////////////////////////////
         // 总节点数: 3
         let node_count = config::get_nodes().len();
         // 最小存活节点
-        let min_active_count = if node_count % 2 == 1 {
+        let expect_min_active_count = if node_count % 2 == 1 {
             (node_count + 1) / 2
         } else {
             node_count / 2
         };
         // 支持者数量: + 自身1票
-        let count = (self.vote_from.keys().len() | sga.vcd.poll_from.len()) + 1;
+        let current_active_count = (self.vote_from.keys().len() | sga.vcd.poll_from.len()) + 1;
         // 至少超过一半存活
-        if count < min_active_count {
+        if current_active_count < expect_min_active_count {
             // 需要等待其他节点
-            log::info!("[{}] - [{}] - Non election conditions, insufficient voting node, waitting for other node join...", sga.vcd.myid, sga.vcd.myid);
+            log::info!("[{}] - [{}] - Lack of voting conditions, current active count is {}, expect min active count is {}, waiting", sga.vcd.myid, sga.vcd.myid, current_active_count, expect_min_active_count);
             return;
         }
 
         // 票数也正确
-        if sga.vcd.poll >= min_active_count {
+        if sga.vcd.poll >= expect_min_active_count {
             // 本节点作为leader
             // 更新自身信息
-            sga.status = shared::Status::LEADING;
-            sga.vcd.leader = sga.vcd.myid;
-            sga.vcd.term += 1;
+            let leader = sga.vcd.myid;
+            let term = sga.vcd.term + 1;
+            sga.sync_leader(leader, term, shared::Status::Leading);
 
             // 同步给客户端
-            msg.vcd.leader = sga.vcd.leader;
-            msg.vcd.term = sga.vcd.term;
+            msg.vcd.sync_leader(leader, term);
 
             // 广播给其他节点，通知其他节点leader已选出
-            if let Some(sessions) = self.namespaces.get(&msg.namespace) {
-                for sid in sessions {
-                    // if sid == &msg.session_id {
-                    //     continue;
-                    // }
-                    if let Some(addr) = self.sessions.get(sid) {
-                        log::debug!(
-                            "[{}] - [{}] - Server BROADCAST to session: {}...",
-                            sga.vcd.myid,
-                            sga.vcd.myid,
-                            sid
-                        );
-                        let message = WsResponse::ok(
-                            WsEvent::LEADER,
-                            "Copy to Voter".to_owned(),
-                            Some(msg.vcd.clone()),
-                        )
-                        .to_string();
-                        addr.do_send(Message(message));
+            for (sid, addr) in self.sessions.iter() {
+                if let Some(vid) = self.session_keys.get(&sid) {
+                    if *vid == sga.vcd.myid {
+                        continue;
                     }
+
+                    log::debug!(
+                        "[{}] - [{}] - Election completed, leader is {}, broadcasting to session {}",
+                        sga.vcd.myid,
+                        vid,
+                        leader,
+                        sid
+                    );
+                    let message = WsResponse::ok(
+                        WsEvent::Leader,
+                        "Copy to Voter".to_owned(),
+                        Some(msg.vcd.clone()),
+                    )
+                    .to_string();
+                    addr.do_send(Message(message));
                 }
             }
         }
@@ -286,11 +251,11 @@ impl Handler<Connect> for ChatServer {
     // 生成session_id
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
         // notify all users in same cluster
-
         // register session with id
-        let session_id = self.rng.gen::<usize>();
+        let session_id: u64 = self.rng.gen::<u64>();
+        let session_id = session_id as usize;
         self.sessions.insert(session_id, msg.addr);
-
+        self.session_keys.insert(session_id, msg.voter_id);
         log::debug!(
             "[{}] - [{}] - Session created, session ID is {}",
             msg.myid,
@@ -299,10 +264,10 @@ impl Handler<Connect> for ChatServer {
         );
 
         // self.session_map.insert(session_id, msg.id);
-        self.namespaces
-            .entry(msg.namespace)
-            .or_default()
-            .insert(session_id);
+        // self.namespaces
+        //     .entry(msg.namespace)
+        //     .or_default()
+        //     .insert(session_id);
 
         // let _ = self.visitor_count.fetch_add(1, Ordering::SeqCst);
         // let count = self.visitor_count.load(Ordering::SeqCst);
@@ -319,7 +284,7 @@ impl Handler<Join> for ChatServer {
     // 普通节点恢复
     // 原leader节点恢复后降级为普通节点
 
-    fn handle(&mut self, mut msg: Join, _: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: Join, _: &mut Context<Self>) -> Self::Result {
         MessageResult(msg)
     }
 }
@@ -330,9 +295,7 @@ impl Handler<Reset> for ChatServer {
     fn handle(&mut self, _msg: Reset, _: &mut Context<Self>) {
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let mut sga = lock.lock();
-        sga.vcd.poll = 1;
-        sga.poll_to = None;
-        sga.released = false;
+        sga.reset_with_vote();
         self.vote_from = HashMap::new();
         cvar.notify_one();
     }
@@ -347,9 +310,9 @@ impl Handler<Copy> for ChatServer {
 }
 
 // 数据同步
-impl Handler<Private> for ChatServer {
+impl Handler<Heartbeat> for ChatServer {
     type Result = ();
-    fn handle(&mut self, msg: Private, _: &mut Context<Self>) {
+    fn handle(&mut self, msg: Heartbeat, _: &mut Context<Self>) {
         self.electing_leader(msg);
     }
 }
@@ -364,27 +327,23 @@ impl Handler<Vote> for ChatServer {
     fn handle(&mut self, mut msg: Vote, _: &mut Context<Self>) -> Self::Result {
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let mut sga = lock.lock();
-        log::debug!("Server Vote: `{:?}`", msg);
-        log::debug!("Server SGA: `{:?}`", sga);
+        // log::debug!("Server Vote: `{:?}`", msg);
+        // log::debug!("Server SGA: `{:?}`", sga);
 
         // 有状态则不用选举
-        match sga.status {
-            shared::Status::LEADING | shared::Status::FOLLOWING => {
-                msg.result = VoteResult::LEADER;
-                log::debug!("[{}] - [{}] - join node...", sga.vcd.myid, msg.vcd.myid);
-                // 同步给客户端
-                msg.vcd.term = sga.vcd.poll;
-                msg.vcd.leader = sga.vcd.leader;
-                return MessageResult(msg);
-            }
-            _ => {}
+        if sga.is_not_looking() {
+            msg.result = VoteResult::Leader;
+            log::debug!("[{}] - [{}] - Join At Follower", sga.vcd.myid, msg.vcd.myid);
+            // 同步给投票人
+            msg.vcd.sync_leader(sga.vcd.leader, sga.vcd.term);
+            return MessageResult(msg);
         }
 
         if sga.vcd.poll == 0 {
             // 拒绝投票
-            msg.result = VoteResult::ABANDON;
+            msg.result = VoteResult::Abandon;
             log::debug!(
-                "[{}] - [{}] - abandon candidate...",
+                "[{}] - [{}] - Abandoned Candidate",
                 sga.vcd.myid,
                 msg.vcd.myid
             );
@@ -398,7 +357,7 @@ impl Handler<Vote> for ChatServer {
         // 投票人：投票周期
         let voter_term = msg.vcd.term;
 
-        let poll = sga.vcd.poll;
+        // let poll = sga.vcd.poll;
         let voter_poll = msg.vcd.poll;
 
         // 是否投票转移
@@ -448,27 +407,32 @@ impl Handler<Vote> for ChatServer {
             }
         }
 
-        if change {
-            // 投票转移
-            // 更新投票信息
-            msg.vcd.poll_from.push(VFrom::new(myid, poll));
-            // 更新自身的投票去向
-            sga.poll_to = Some(VTo::new(msg.vcd.myid, poll));
-            log::debug!(
-                "[{}] - [{}] - Voting change actively, change votes {} to voter {}",
-                sga.vcd.myid,
-                msg.vcd.myid,
-                poll,
-                msg.vcd.myid
-            );
+        // 票数获得:
+        // 方式1:投票失败后,通过投票将自身的票数带回(存在缺陷)
+        // 方式2:投票失败后,返回投票失败消息,通过voter正常投票
 
-            // 投票确认
-            msg.vcd.poll += sga.vcd.poll;
-            // 自身投票清空
-            sga.vcd.poll = 0;
-            // 全部票数投出去了，本节点已经变成投票人了(非候选人)
-            sga.released = true;
-            msg.result = VoteResult::CHANGE;
+        if change {
+            // // 投票转移
+            // // 更新投票信息
+            // msg.vcd.poll_from.push(VFrom::new(myid, poll));
+            // // 更新自身的投票去向
+            // sga.poll_to = Some(VTo::new(msg.vcd.myid, poll));
+            // log::debug!(
+            //     "[{}] - [{}] - Voting change actively, change votes {} to voter {}",
+            //     sga.vcd.myid,
+            //     msg.vcd.myid,
+            //     poll,
+            //     msg.vcd.myid
+            // );
+
+            // // 投票确认
+            // msg.vcd.poll += sga.vcd.poll;
+            // // 自身投票清空
+            // sga.vcd.poll = 0;
+            // // 全部票数投出去了，本节点已经变成投票人了(非候选人)
+            // sga.released = true;
+            // msg.result = VoteResult::CHANGE;
+            msg.result = VoteResult::Change;
         } else {
             // 投票确认
             sga.vcd.poll += voter_poll;
@@ -479,7 +443,7 @@ impl Handler<Vote> for ChatServer {
             self.vote_from.insert(msg.vcd.myid, voter_poll);
 
             log::debug!(
-                "[{}] - [{}] - Voting confirmed, received votes {}, total votes {}",
+                "[{}] - [{}] - Voting completed, acquired votes {}, total votes {}",
                 sga.vcd.myid,
                 msg.vcd.myid,
                 voter_poll,
@@ -495,18 +459,18 @@ impl Handler<Vote> for ChatServer {
             sga.poll_from(vfrom.clone());
             msg.vcd.poll_from.push(vfrom);
 
-            msg.result = VoteResult::SUCCESS;
+            msg.result = VoteResult::Ok;
 
             // 选举leader
             // self.electing_header();
         }
 
-        log::debug!(
-            "[{}] - [{}] - Server Vote: SGA: {:?}",
-            sga.vcd.myid,
-            msg.vcd.myid,
-            sga.clone()
-        );
+        // log::debug!(
+        //     "[{}] - [{}] - Server Vote: SGA: {:?}",
+        //     sga.vcd.myid,
+        //     msg.vcd.myid,
+        //     sga.clone()
+        // );
         cvar.notify_one();
 
         return MessageResult(msg);
@@ -518,42 +482,68 @@ impl Handler<Disconnect> for ChatServer {
     type Result = ();
 
     fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
-        if msg.closed {
+        if msg.closed || msg.voter_id == msg.myid {
             return;
         }
 
-        let mut namespaces: Vec<String> = Vec::new();
-        // let _ = self.visitor_count.fetch_sub(1, Ordering::SeqCst);
+        let myid = msg.myid;
+        let leader;
+        {
+            let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
+            let sga = lock.lock();
+            leader = sga.vcd.leader;
+            cvar.notify_one();
+        }
 
-        // remove address
-        if self.sessions.remove(&msg.id).is_some() {
-            // remove session from all namespaces
-            for (ns, sessions) in &mut self.namespaces {
-                if sessions.remove(&msg.id) {
-                    namespaces.push(ns.to_owned());
-                }
-                log::info!("{} - - Session {} removed from {}", msg.ip, msg.id, ns);
+        if myid == leader {
+            // leader异常，则无需打印，且无法广播数据到其他节点
+            return;
+        }
+
+        // 从会话列表中删除
+        let _removed_vid = match self.sessions.remove(&msg.session_id).and_then(|_| {
+            self.session_keys.remove(&msg.session_id)
+        }) {
+            Some(v) => {
+                log::info!(
+                    "[{}] - [{}] - Session {} removed",
+                    msg.myid,
+                    msg.voter_id,
+                    msg.session_id,
+                );
+                v
+            },
+            None => return,
+        };
+
+        // 通知其他会话，排除本地心跳会话
+        // session_keys: session_id: voter_id
+        for (sid, addr) in self.sessions.iter() {
+            let vid = match self.session_keys.get(&sid) {
+                None => continue,
+                Some(id) => id,
+            };
+
+            // 本地连接
+            if *vid == myid {
+                continue;
             }
+
+            // 针对本机使用CTRL+C停止，且本机非leader时，会提示“Leader off-lined, broadcast to...”
+            // 解决方式：取消signal：CTRL+C
+            let message = if leader == msg.voter_id {
+                log::debug!(
+                    "[{myid}] - [{}] - Leader off-lined, broadcast to {vid} of session {sid}", msg.voter_id
+                );
+                WsResponse::ok(WsEvent::LeaderOffline, "Leader Offline".to_owned(), None)
+            } else {
+                log::debug!(
+                    "[{myid}] - [{}] - Follower off-lined, broadcast to {vid} of session {sid}", msg.voter_id
+                );
+                WsResponse::ok(WsEvent::Offline, "Offline".to_owned(), None)
+            };
+            
+            addr.do_send(Message(message.to_string()));
         }
-        // send message to other users
-        for ns in namespaces {
-            self.send_message(
-                &ns,
-                &format!("UID {} kicked out of the cluster [{}].", msg.id, ns),
-                0,
-            );
-
-            // let count = self.visitor_count.load(Ordering::SeqCst);
-            // self.send_message(&ns, &format!("Current Total visitors {count}"), 0);
-        }
-    }
-}
-
-/// Handler for Message message.
-impl Handler<ClientMessage> for ChatServer {
-    type Result = ();
-
-    fn handle(&mut self, msg: ClientMessage, _: &mut Context<Self>) {
-        self.send_message(&msg.cluster, msg.msg.as_str(), msg.id);
     }
 }

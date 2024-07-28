@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-use std::{env, fs};
-use std::path::{Path, PathBuf};
-use std::{fs::File, io};
-use std::io::Error;
-
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::Error;
+use std::path::{Path, PathBuf};
+use std::{env, fs};
+use std::{fs::File, io};
 use structopt::StructOpt;
 
 lazy_static! {
@@ -16,35 +15,35 @@ lazy_static! {
 pub static DEFAULT_PORT: u16 = 6969;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppConfig{
+pub struct AppConfig {
     // 服务端
     pub server: Option<AppConfigServer>,
     // 客户端
     pub client: Option<AppConfigClient>,
-    // 心跳信息      
+    // 心跳信息
     pub heartbeat: Option<AppConfigHeartbeat>,
     // 集群服务节点
-    pub node: Option<Vec<AppConfigNode>>
+    pub node: Option<Vec<AppConfigNode>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfigServer {
-
     // ID：默认为1
-    pub server_id: Option<usize>,  
+    pub server_id: Option<usize>,
     // 启动端口：默认为6969
-    pub port: Option<u16>,        
-    // 启动线程数：默认为2   
-    pub worker: Option<usize>,       
+    pub port: Option<u16>,
+    // 启动线程数：默认为2
+    pub worker: Option<usize>,
     // 命名空间：默认为 defaults
-    pub namespaces: Option<Vec<String>>,
+    // pub namespaces: Option<Vec<String>>,
     // 默认数据库：默认为 ./${id}/app.db
-    // pub sqlite: Option<String>,                     
+    // pub sqlite: Option<String>,
     // 权重：默认为1
     pub weight: Option<usize>,
     // 数据文件目录
     pub data_root: Option<String>,
-
+    // 如果leader选举一直等不到过半的节点存活，则超过这个时间，就退出，避免脑裂
+    pub discovery_wait_timeout: Option<usize>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -65,15 +64,13 @@ pub struct AppConfigClient {
     pub namespace: Option<String>,
 }
 
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfigHeartbeat {
     // 心跳间隔，秒
     pub interval: Option<usize>,
     // 心跳超时，秒
-    pub timeout: Option<usize>
+    pub timeout: Option<usize>,
 }
-
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AppConfigNode {
@@ -82,14 +79,13 @@ pub struct AppConfigNode {
     // 服务节点，默认127.0.0.1
     pub host: Option<String>,
     // 服务端口，默认6969
-    pub port: Option<u16>
+    pub port: Option<u16>,
 }
 
 /// Host Based Authorization - Ident
 #[derive(Debug, Clone, Deserialize)]
 pub struct HostBasedAuth {
     pub map: HashMap<String, Vec<Ident>>,
-    
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -101,9 +97,7 @@ pub struct Ident {
 }
 
 impl HostBasedAuth {
-    
     pub fn new() -> Self {
-
         let path = "./hba_ident.toml";
 
         let toml_text = fs::read_to_string(path).unwrap();
@@ -117,12 +111,13 @@ impl HostBasedAuth {
     }
 
     pub fn match_ident(&self, app_key: &str, app_secret: &str) -> HashMap<String, Ident> {
-
         let mut ret = HashMap::new();
 
         for (host, idents) in self.map.iter() {
             for ident in idents {
-                if ident.app_key.eq_ignore_ascii_case(app_key) && ident.app_secret.eq_ignore_ascii_case(app_secret) {
+                if ident.app_key.eq_ignore_ascii_case(app_key)
+                    && ident.app_secret.eq_ignore_ascii_case(app_secret)
+                {
                     ret.insert(host.to_owned(), ident.to_owned());
                 }
             }
@@ -132,36 +127,53 @@ impl HostBasedAuth {
     }
 }
 
-
 #[derive(Debug, StructOpt)]
 pub struct Opt {
-
     #[structopt(short, long)]
     pub debug: bool,
 
     #[structopt(short="-i", long, parse(try_from_str=parse_file_path))]
     pub defaults_file: String,
-
 }
 
 // SERVER
 pub fn get_server_id() -> usize {
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.server_id }).unwrap_or(1)
+    APP_CONFIG
+        .server
+        .clone()
+        .and_then(|s: AppConfigServer| s.server_id)
+        .unwrap_or(1)
 }
 
 pub fn get_server_port() -> u16 {
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.port }).unwrap_or(DEFAULT_PORT)
+    APP_CONFIG
+        .server
+        .clone()
+        .and_then(|s: AppConfigServer| s.port)
+        .unwrap_or(DEFAULT_PORT)
 }
 
 pub fn get_server_worker() -> usize {
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.worker }).unwrap_or(2)
+    APP_CONFIG
+        .server
+        .clone()
+        .and_then(|s: AppConfigServer| s.worker)
+        .unwrap_or(2)
 }
 
-pub fn get_server_namespaces() -> Vec<String> {
-    let mut default = Vec::new();
-    default.push(String::from("default"));
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.namespaces }).unwrap_or(default)
+pub fn get_server_discovery_wait_timeout() -> usize {
+    APP_CONFIG
+        .server
+        .clone()
+        .and_then(|s: AppConfigServer| s.discovery_wait_timeout)
+        .unwrap_or(60)
 }
+
+// pub fn get_server_namespaces() -> Vec<String> {
+//     let mut default = Vec::new();
+//     default.push(String::from("default"));
+//     APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.namespaces }).unwrap_or(default)
+// }
 
 // pub fn get_server_sqlite() -> String {
 //     let path = APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.sqlite }).unwrap_or(format!("{}/{}/ayisha.db", get_server_data_root(), get_server_id()));
@@ -171,13 +183,21 @@ pub fn get_server_namespaces() -> Vec<String> {
 // }
 
 pub fn get_server_weight() -> usize {
-    APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.weight }).unwrap_or(1)
+    APP_CONFIG
+        .server
+        .clone()
+        .and_then(|s: AppConfigServer| s.weight)
+        .unwrap_or(1)
 }
 
 pub fn get_server_data_root() -> PathBuf {
     let pwd = env::current_dir().unwrap();
     let default_data_root = pwd.join(format!(".{}", env!("CARGO_PKG_NAME")));
-    let data_root = APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.data_root }).unwrap_or(default_data_root.display().to_string());
+    let data_root = APP_CONFIG
+        .server
+        .clone()
+        .and_then(|s: AppConfigServer| s.data_root)
+        .unwrap_or(default_data_root.display().to_string());
 
     let path = Path::new(&data_root).to_path_buf();
     fs::create_dir_all(&path).unwrap();
@@ -198,9 +218,6 @@ pub fn get_nodes() -> Vec<AppConfigNode> {
     nodes
 }
 
-
-
-
 // pub fn get_db_connection() -> Connection {
 //     let p = get_server_sqlite();
 //     log::debug!("Open sqlite db: {}", p);
@@ -216,29 +233,42 @@ pub fn get_nodes() -> Vec<AppConfigNode> {
 //     conn
 // }
 
-
-// CLIENT 
+// CLIENT
 pub fn get_client_singleton() -> bool {
-    APP_CONFIG.client.clone().and_then(|c| { c.singleton }).unwrap_or(false)
+    APP_CONFIG
+        .client
+        .clone()
+        .and_then(|c| c.singleton)
+        .unwrap_or(false)
 }
 
 pub fn get_client_app_key() -> String {
-    APP_CONFIG.client.clone().and_then(|c| { c.app_key }).unwrap_or(String::new())
+    APP_CONFIG
+        .client
+        .clone()
+        .and_then(|c| c.app_key)
+        .unwrap_or(String::new())
 }
 
 pub fn get_client_app_secret() -> String {
-    APP_CONFIG.client.clone().and_then(|c| { c.app_secret }).unwrap_or(String::new())
+    APP_CONFIG
+        .client
+        .clone()
+        .and_then(|c| c.app_secret)
+        .unwrap_or(String::new())
 }
 
 pub fn get_client_connect_retry() -> usize {
-    APP_CONFIG.client.clone().and_then(|c| { c.connect_retry }).unwrap_or(60)
+    APP_CONFIG
+        .client
+        .clone()
+        .and_then(|c| c.connect_retry)
+        .unwrap_or(60)
 }
 
-pub fn get_client_namespace() -> String {
-    APP_CONFIG.client.clone().and_then(|c| { c.namespace }).unwrap_or(String::from("defaults"))
-}
-
-
+// pub fn get_client_namespace() -> String {
+//     APP_CONFIG.client.clone().and_then(|c| { c.namespace }).unwrap_or(String::from("defaults"))
+// }
 
 pub fn get_appconfig() -> AppConfig {
     let opt = Opt::from_args();
@@ -247,7 +277,10 @@ pub fn get_appconfig() -> AppConfig {
     let config: AppConfig = match toml::from_str(&toml_text) {
         Ok(p) => p,
         Err(e) => {
-            panic!("<ParseTOML> File {} cannot be parsed, CAUSE:\n{}", opt.defaults_file, e);
+            panic!(
+                "<ParseTOML> File {} cannot be parsed, CAUSE:\n{}",
+                opt.defaults_file, e
+            );
         }
     };
     config
@@ -255,9 +288,7 @@ pub fn get_appconfig() -> AppConfig {
 
 fn parse_file_path(p: &str) -> Result<String, io::Error> {
     match File::open(p) {
-        Ok(_) => {Ok(String::from(p))},
-        Err(e) => {
-            Err(Error::new(io::ErrorKind::NotFound, format!("{}: {}", p, e)))
-        }
+        Ok(_) => Ok(String::from(p)),
+        Err(e) => Err(Error::new(io::ErrorKind::NotFound, format!("{}: {}", p, e))),
     }
 }
