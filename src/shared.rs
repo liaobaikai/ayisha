@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
 
 use chrono::Duration;
 use parking_lot::{Condvar, Mutex};
@@ -29,6 +29,8 @@ pub struct GlobalArea {
     pub status: Status,
     // 如果leader选举一直等不到过半的节点存活，则超过这个时间，就退出，避免脑裂
     pub discovery_wait_timeout: Duration,
+    // 连接失败的节点
+    pub hb_failed: HashMap<usize, usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,11 +50,20 @@ impl GlobalArea {
             discovery_wait_timeout: Duration::seconds(
                 config::get_server_discovery_wait_timeout() as i64
             ),
+            hb_failed: HashMap::new()
         }
     }
 
     /// 重置
     pub fn reset_with_vote(&mut self) {
+        self.vcd.reset_with_vote();
+        self.poll_to = None;
+        self.released = false;
+        self.status = Status::Looking;
+    }
+
+    /// 降级为following
+    pub fn to_following(&mut self) {
         self.vcd.reset_with_vote();
         self.poll_to = None;
         self.released = false;
@@ -111,6 +122,15 @@ impl GlobalArea {
         }
     }
 
+    // 添加心跳失败的节点
+    // pub fn hb_failed(&mut self, to: usize, from: usize) {
+    //     self.vcd.hb_failed(to, from);
+    // }
+
+    // pub fn remove_hb_failed(&mut self, to: usize) {
+    //     self.vcd.hb_failed.remove(&to);
+    // }
+
     pub fn fmt(&self) -> String {
         format!(
             "{{ status = \"{:?}\", released = {}, poll_to = {}, vcd = {} }}",
@@ -139,8 +159,10 @@ pub struct VCData {
     pub poll_from: Vec<VFrom>,
     // 投票转移
     pub poll_changed: Vec<usize>,
-    // 异常节点: from, to
-    pub hb_failed: HashMap<usize, usize>
+    // 心跳失败异常节点: from, to
+    // 如果出现节点孤岛的时候，应该把leader降级为follower
+    // 网络出现异常，导致全部节点无法互相连接时
+    // pub hb_failed: HashMap<usize, usize>
 }
 
 impl VCData {
@@ -153,7 +175,7 @@ impl VCData {
             tranx: 0,
             poll_from: Vec::new(),
             poll_changed: Vec::new(),
-            hb_failed: HashMap::new(),
+            // hb_failed: HashMap::new(),
         }
     }
 
@@ -171,15 +193,9 @@ impl VCData {
     }
 
     // 添加心跳失败的节点
-    pub fn hb_failed(&mut self, from: usize, to: usize) -> bool {
-        
-        if self.hb_failed.contains_key(&from) {
-            return false;
-        }
-        self.hb_failed.insert(from, to);
-
-        true
-    }
+    // pub fn hb_failed(&mut self, to: usize, from: usize) {
+    //     self.hb_failed.insert(to, from);
+    // }
 
 }
 

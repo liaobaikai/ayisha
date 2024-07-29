@@ -1,6 +1,6 @@
 use crate::{
     config,
-    shared::{self, VCData, VFrom},
+    shared::{self, Status, VCData, VFrom},
     ws::{WsEvent, WsResponse},
 };
 use actix::prelude::*;
@@ -77,11 +77,20 @@ pub struct Reset {
 
 // 节点内部通讯
 #[derive(Message)]
-#[rtype(result = "()")]
+#[rtype(Heartbeat)]
 pub struct Heartbeat {
     pub session_id: usize,
-    // pub namespace: String,
     pub vcd: VCData,
+    pub hb_failed_count: usize,
+    pub result: HbResult,
+}
+
+#[derive(Debug)]
+pub enum HbResult {
+    Undefined,
+    Election,
+    Ok,
+    Follower,
 }
 
 // 投票
@@ -91,13 +100,8 @@ pub struct Vote {
     pub session_id: usize,
     // 实际数据
     pub vcd: VCData,
-    // 是否投票成功
-    // pub ok: bool,
     // 锁等待超时
     pub timeout: bool,
-    // 命名空间
-    // pub namespace: String,
-    //
     pub result: VoteResult,
 }
 
@@ -129,6 +133,8 @@ pub struct ChatServer {
     vote_from: HashMap<usize, usize>,
     // SESSION_ID, VOTER_ID
     session_keys: HashMap<usize, usize>,
+    // 连接失败数统计，超过3次，则降级
+    hb_failed_count: usize,
 }
 
 impl ChatServer {
@@ -139,6 +145,7 @@ impl ChatServer {
             rng: rand::thread_rng(),
             vote_from: HashMap::new(),
             session_keys: HashMap::new(),
+            hb_failed_count: 0,
         }
     }
 }
@@ -147,16 +154,14 @@ impl ChatServer {
 
     // 选举领导者
     // 超过超过半数才开始选举
-    fn electing_leader(&mut self, mut msg: Heartbeat) {
-        let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
-        let mut sga = lock.lock();
+    fn electing_leader(&mut self, mut sga: parking_lot::lock_api::MutexGuard<parking_lot::RawMutex, shared::GlobalArea>, mut msg: Heartbeat) -> Heartbeat {
+        
         if sga.released {
-            cvar.notify_one();
-            return;
+            return msg;
         }
         // 有状态则不用选举
         if sga.is_not_looking() {
-            return;
+            return msg;
         }
 
         // 重新选举 term > 0
@@ -182,14 +187,17 @@ impl ChatServer {
         } else {
             node_count / 2
         };
+        
         // 支持者数量: + 自身1票
         let current_active_count = (self.vote_from.keys().len() | sga.vcd.poll_from.len()) + 1;
-        // 至少超过一半存活
+        // 至少超过一半存活，否则等待
         if current_active_count < expect_min_active_count {
             // 需要等待其他节点
             log::info!("[{}] - [{}] - Lack of voting conditions, current active count is {}, expect min active count is {}, waiting", sga.vcd.myid, sga.vcd.myid, current_active_count, expect_min_active_count);
-            return;
+            return msg;
         }
+
+        
 
         // 票数也正确
         if sga.vcd.poll >= expect_min_active_count {
@@ -198,6 +206,9 @@ impl ChatServer {
             let leader = sga.vcd.myid;
             let term = sga.vcd.term + 1;
             sga.sync_leader(leader, term, shared::Status::Leading);
+
+            // 选举成功
+            msg.result = HbResult::Election;
 
             // 同步给客户端
             msg.vcd.sync_leader(leader, term);
@@ -226,6 +237,8 @@ impl ChatServer {
                 }
             }
         }
+
+        msg
     }
 }
 
@@ -275,7 +288,7 @@ impl Handler<Reset> for ChatServer {
     type Result = ();
     fn handle(&mut self, _msg: Reset, _: &mut Context<Self>) {
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
-        let mut sga = lock.lock();
+        let mut sga: parking_lot::lock_api::MutexGuard<parking_lot::RawMutex, shared::GlobalArea> = lock.lock();
         sga.reset_with_vote();
         self.vote_from = HashMap::new();
         cvar.notify_one();
@@ -292,9 +305,51 @@ impl Handler<Copy> for ChatServer {
 
 // 数据同步
 impl Handler<Heartbeat> for ChatServer {
-    type Result = ();
-    fn handle(&mut self, msg: Heartbeat, _: &mut Context<Self>) {
-        self.electing_leader(msg);
+    type Result = MessageResult<Heartbeat>;
+    fn handle(&mut self, mut msg: Heartbeat, _: &mut Context<Self>) -> Self::Result {
+
+        let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
+        let sga = lock.lock();
+        match sga.status {
+            shared::Status::Looking => {
+                let msg = self.electing_leader(sga, msg);
+                cvar.notify_one();
+                return MessageResult(msg);
+            },
+            shared::Status::Leading => {
+                if msg.hb_failed_count > 0 && msg.hb_failed_count != self.hb_failed_count {
+                    // 数据改变了，且超过3次，则降级为普通节点
+                    // 总节点数: 3
+                    let node_count = config::get_nodes().len();
+                    // 最小存活节点
+                    let expect_min_active_count = if node_count % 2 == 1 {
+                        (node_count + 1) / 2
+                    } else {
+                        node_count / 2
+                    };
+
+                    // 至少超过一半存活，否则认为是孤岛
+                    if msg.hb_failed_count < expect_min_active_count {
+                        cvar.notify_one();
+                        return MessageResult(msg);
+                    }
+                    // 存活不过半了，将自己降级
+                    msg.result = HbResult::Follower;
+                    self.vote_from = HashMap::new();
+                    
+                    cvar.notify_one();
+                    return MessageResult(msg);
+                }
+                self.hb_failed_count = msg.hb_failed_count;
+
+            }
+            _ => {}
+        }
+
+        msg.result = HbResult::Ok;
+
+        cvar.notify_one();
+        return MessageResult(msg);
     }
 }
 

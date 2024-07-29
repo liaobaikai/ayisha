@@ -6,7 +6,8 @@ use crate::{
 use awc::ws::{Frame, Message};
 use bytestring::ByteString;
 use futures_util::{SinkExt as _, StreamExt as _};
-use std::time::{Duration, Instant};
+use parking_lot::Mutex;
+use std::{collections::HashMap, time::{Duration, Instant}};
 use tokio::{
     select,
     sync::mpsc::{self},
@@ -61,7 +62,6 @@ impl VoteHandler {
             // 加入后进入投票环节
             let mut event;
             let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
-
             loop {
                 select! {
 
@@ -81,6 +81,15 @@ impl VoteHandler {
                                 let mut sga = lock.lock();
                                 // 重新开始投票
                                 sga.reset_with_vote();
+                            }
+                            ws::WsEvent::Follower => {
+                                // leader reset
+                                log::info!("[{}] - [{}] - to Follower", &myid, &server_id);
+                                let mut sga = lock.lock();
+                                // 降级为Follower
+                                sga.to_following();
+                                // 清除连接失败
+                                sga.hb_failed.clear();
                             }
                             ws::WsEvent::Vote => {
                                 // 投票
@@ -141,6 +150,7 @@ impl VoteHandler {
 
                         // 没有票数的时候，就等待
                         let mut sga = lock.lock();
+                        
                         // 没有leader
                         if !sga.is_not_looking() {
 
@@ -188,13 +198,14 @@ impl VoteHandler {
                         }
 
                         if myid == server_id {
-                            event = ws::WsEvent::Heartbeat
+                            event = ws::WsEvent::Heartbeat;
                         }
 
                         // 连接123，数据重装，将票数来源
                         let src = WsRequest{
                             event: event.clone(),
-                            vcd: sga.get_vcd()
+                            vcd: sga.get_vcd(),
+                            hb_failed_count: sga.hb_failed.len()
                         }.to_bytestr();
 
                         if let Err(e) = tx.send(src) {
@@ -212,6 +223,7 @@ impl VoteHandler {
             "ws://{}:{}/im/chat/{}/{}",
             self.addr, self.port, server_id, myid
         );
+        
         let (_resp, mut ws) = match awc::Client::new()
             .ws(&url)
             .header(servlet::imguard::HEADER_APP_KEY, app_key)
@@ -226,7 +238,7 @@ impl VoteHandler {
                     self.addr,
                     self.port
                 );
-
+                
                 // 如果连接失败的是leader
                 let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
                 let mut sga = lock.lock();
@@ -234,6 +246,9 @@ impl VoteHandler {
                     // 重置，开始投票
                     sga.reset_with_vote();
                     log::debug!("[{myid}] - [{server_id}] - Leader offline, start voting leader");
+                } else {
+                    // 连接失败
+                    sga.hb_failed.insert(server_id, myid);
                 }
                 cvar.notify_one();
                 token.cancel();
@@ -246,6 +261,14 @@ impl VoteHandler {
             self.addr,
             self.port
         );
+
+        
+
+        // 连接成功
+        // let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
+        // let mut sga = lock.lock();
+        // sga.remove_hb_failed(server_id);
+        // cvar.notify_one();
 
         loop {
             tokio::select! {

@@ -92,11 +92,11 @@ dirs = ["bin", "config", "scripts", "elib"]
 # 动态变化文件，准实时同步
 vars = ["rmp", "vcfsa", "dict", "debug"]
 
-[[guard]]
-[[guard.src]]
-root = "/data/dataxone/sync/ds1"
-dirs = ["bin", "config", "scripts", "elib"]
-vars = ["rmp", "vcfsa", "dict", "debug"]
+# [[guard]]
+# [[guard.src]]
+# root = "/data/dataxone/sync/ds1"
+# dirs = ["bin", "config", "scripts", "elib"]
+# vars = ["rmp", "vcfsa", "dict", "debug"]
 
 # [[guard.dst]]
 # root = "/data/dataxone/sync/dt1"

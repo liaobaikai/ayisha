@@ -270,17 +270,51 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                     }
 
                     WsEvent::Heartbeat => {
-                        // 重置 SGA 数据
-                        self.addr.do_send(server::Heartbeat {
+                        // 处理心跳事件
+                        let data = server::Heartbeat {
                             session_id: self.session_id,
                             vcd: v.vcd.clone(),
-                        });
+                            hb_failed_count: v.hb_failed_count,
+                            result: server::HbResult::Undefined
+                        };
 
-                        // 心跳完成
-                        ctx.text(
-                            WsResponse::ok(WsEvent::Heartbeat, "Heartbeat".to_owned(), None)
-                                .to_string(),
-                        );
+                        self.addr
+                            .send(data)
+                            .into_actor(self)
+                            .then(move |res, _, ctx| {
+                                if let Ok(hb) = res {
+                                    match hb.result {
+                                        server::HbResult::Undefined => {},
+                                        server::HbResult::Ok => {
+                                            ctx.text(
+                                                WsResponse::ok(WsEvent::Heartbeat, "Heartbeat".to_owned(), None)
+                                                    .to_string(),
+                                            );
+                                        },
+                                        server::HbResult::Election => {
+                                            // 选举成功
+                                            ctx.text(
+                                                WsResponse::ok(WsEvent::Heartbeat, "Election OK".to_owned(), None)
+                                                    .to_string(),
+                                            );
+                                        },
+                                        server::HbResult::Follower => {
+                                            // leader降级
+                                            ctx.text(
+                                                WsResponse::ok(WsEvent::Follower, "to Follower OK".to_owned(), None)
+                                                    .to_string(),
+                                            );
+                                        },
+                                    }
+                                    // 心跳完成
+                                    
+                                } else {
+                                    println!("Something is wrong")
+                                }
+                                fut::ready(())
+                            })
+                            .wait(ctx);
+
                     }
 
                     WsEvent::Vote => {

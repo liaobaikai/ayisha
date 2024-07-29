@@ -9,6 +9,9 @@ pub struct WsRequest {
 
     // json数据
     pub vcd: VCData,
+
+    // 连接失败的数量，如果超过半数，则需要降级
+    pub hb_failed_count: usize,
 }
 
 // #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -79,6 +82,8 @@ pub enum WsEvent {
     // BroadcastAfterElectionLeader,
     // 重置数据
     Reset,
+    // 降级为Follower
+    Follower,
     // leader下线
     LeaderOffline,
     // leader下线

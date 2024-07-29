@@ -21,9 +21,9 @@
             },
             // "args": ["--defaults-file=C:\\Users\\BK-liao\\ayisha\\ayisha.toml"],
             // "args": ["--defaults-file=C:\\Users\\BK-liao\\ayisha\\ayisha-6070.toml"],
-            // "args": ["--defaults-file=C:\\Users\\BK-liao\\ayisha\\ayisha-6071.toml"],
+            "args": ["--defaults-file=C:\\Users\\BK-liao\\ayisha\\ayisha-6071.toml"],
             // "args": ["--defaults-file=/Users/lbk/ayisha/ayisha-6070.toml"],
-            "args": ["--defaults-file=/Users/lbk/ayisha/ayisha.toml"],
+            // "args": ["--defaults-file=/Users/lbk/ayisha/ayisha.toml"],
             "cwd": "${workspaceFolder}"
         },
         {
