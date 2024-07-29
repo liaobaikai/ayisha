@@ -260,7 +260,7 @@ impl VoteHandler {
 
                             // 接收数据解析
                             let raw = String::from_utf8_lossy(msg.as_ref()).to_string();
-                            log::debug!("[{myid}] - [{server_id}] - recv data <= {raw}");
+                            log::debug!("[{myid}] - [{server_id}] - Recv data <= {raw}");
 
                             let v = match WsResponse::from_str(&raw) {
                                 Ok(v) => v,
