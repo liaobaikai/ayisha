@@ -24,6 +24,9 @@ pub struct AppConfig {
     pub heartbeat: Option<AppConfigHeartbeat>,
     // 集群服务节点
     pub node: Option<Vec<AppConfigNode>>,
+    //
+    pub guard_common: Option<AppGuardCommon>,
+    pub guard: Option<Vec<AppGuard>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -34,10 +37,6 @@ pub struct AppConfigServer {
     pub port: Option<u16>,
     // 启动线程数：默认为2
     pub worker: Option<usize>,
-    // 命名空间：默认为 defaults
-    // pub namespaces: Option<Vec<String>>,
-    // 默认数据库：默认为 ./${id}/app.db
-    // pub sqlite: Option<String>,
     // 权重：默认为1
     pub weight: Option<usize>,
     // 数据文件目录
@@ -50,18 +49,50 @@ pub struct AppConfigServer {
 pub struct AppConfigClient {
     // 是否跟随server启动，默认为false
     pub singleton: Option<bool>,
-
     // APP_KEY
     pub app_key: Option<String>,
-
     // APP_SECRET
     pub app_secret: Option<String>,
-
     // 连接丢失的情况下 重新尝试连接主服务器之前睡眠的秒数
     pub connect_retry: Option<usize>,
+}
 
-    // 命名空间：默认为 defaults
-    pub namespace: Option<String>,
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AppGuardCommon {
+    // 基础目录
+    pub root: Vec<AppGuardCommonItem>,
+    // 目录
+    pub dirs: Vec<String>,
+    // 变化的文件、路径
+    pub vars: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AppGuardCommonItem {
+    // 源
+    pub src: String,
+    // 目标
+    pub dst: String,
+    pub ext: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AppGuard {
+    // 源
+    pub src: AppGuardItem,
+    // 目标
+    pub dst: AppGuardItem,
+    pub ext: Option<AppGuardItem>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AppGuardItem {
+    // 基础目录
+    pub root: String,
+    // 目录
+    pub dirs: Option<Vec<String>>,
+    // 变化的文件、路径
+    pub vars: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -169,19 +200,6 @@ pub fn get_server_discovery_wait_timeout() -> usize {
         .unwrap_or(60)
 }
 
-// pub fn get_server_namespaces() -> Vec<String> {
-//     let mut default = Vec::new();
-//     default.push(String::from("default"));
-//     APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.namespaces }).unwrap_or(default)
-// }
-
-// pub fn get_server_sqlite() -> String {
-//     let path = APP_CONFIG.server.clone().and_then(|s: AppConfigServer| { s.sqlite }).unwrap_or(format!("{}/{}/ayisha.db", get_server_data_root(), get_server_id()));
-//     let parent = Path::new(&path).parent().unwrap();
-//     let _ = fs::create_dir_all(parent).unwrap();
-//     path
-// }
-
 pub fn get_server_weight() -> usize {
     APP_CONFIG
         .server
@@ -218,21 +236,6 @@ pub fn get_nodes() -> Vec<AppConfigNode> {
     nodes
 }
 
-// pub fn get_db_connection() -> Connection {
-//     let p = get_server_sqlite();
-//     log::debug!("Open sqlite db: {}", p);
-//     let conn = match Connection::open(&p) {
-//         Ok(conn) => conn,
-//         Err(e) => {
-//             panic!("<sqlite> Database {} cannot be opened, CAUSE: {}", p, e);
-//         }
-//     };
-//     for sql in INIT_SQL_LIST {
-//         let _ = conn.execute(sql, ());
-//     }
-//     conn
-// }
-
 // CLIENT
 pub fn get_client_singleton() -> bool {
     APP_CONFIG
@@ -265,10 +268,6 @@ pub fn get_client_connect_retry() -> usize {
         .and_then(|c| c.connect_retry)
         .unwrap_or(60)
 }
-
-// pub fn get_client_namespace() -> String {
-//     APP_CONFIG.client.clone().and_then(|c| { c.namespace }).unwrap_or(String::from("defaults"))
-// }
 
 pub fn get_appconfig() -> AppConfig {
     let opt = Opt::from_args();

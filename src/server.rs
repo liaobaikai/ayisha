@@ -144,12 +144,6 @@ impl ChatServer {
 }
 
 impl ChatServer {
-    /// Send message to all users in the cluster
-    // fn send_message(&self, namespace: &str, message: &str, skip_sid: usize) {
-    //     for (sid, addr) in self.sessions {
-    //         addr.do_send(Message(message.to_owned()));
-    //     }
-    // }
 
     // 选举领导者
     // 超过超过半数才开始选举
@@ -250,8 +244,6 @@ impl Handler<Connect> for ChatServer {
 
     // 生成session_id
     fn handle(&mut self, msg: Connect, _: &mut Context<Self>) -> Self::Result {
-        // notify all users in same cluster
-        // register session with id
         let session_id: u64 = self.rng.gen::<u64>();
         let session_id = session_id as usize;
         self.sessions.insert(session_id, msg.addr);
@@ -262,17 +254,6 @@ impl Handler<Connect> for ChatServer {
             msg.voter_id,
             session_id
         );
-
-        // self.session_map.insert(session_id, msg.id);
-        // self.namespaces
-        //     .entry(msg.namespace)
-        //     .or_default()
-        //     .insert(session_id);
-
-        // let _ = self.visitor_count.fetch_add(1, Ordering::SeqCst);
-        // let count = self.visitor_count.load(Ordering::SeqCst);
-        // self.send_message(&config::get_server_namespace(), &format!("Total visitors {count}"), 0);
-
         // send id back
         session_id
     }
@@ -327,8 +308,6 @@ impl Handler<Vote> for ChatServer {
     fn handle(&mut self, mut msg: Vote, _: &mut Context<Self>) -> Self::Result {
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let mut sga = lock.lock();
-        // log::debug!("Server Vote: `{:?}`", msg);
-        // log::debug!("Server SGA: `{:?}`", sga);
 
         // 有状态则不用选举
         if sga.is_not_looking() {
@@ -363,10 +342,7 @@ impl Handler<Vote> for ChatServer {
         // 是否投票转移
         let mut change = false;
         if term > voter_term {
-            // 过期投票、无效投票
-            // 投票人投票周期比本人小，忽略，忽略该节点的投票信息
-            // 这种场景一般是由于离线较久后恢复。
-            // 加入节点需要同步数据。
+            // pass
         } else if term < voter_term {
             // 候选人失去候选机会，投票失败，票数转移
             change = true;
@@ -410,28 +386,7 @@ impl Handler<Vote> for ChatServer {
         // 票数获得:
         // 方式1:投票失败后,通过投票将自身的票数带回(存在缺陷)
         // 方式2:投票失败后,返回投票失败消息,通过voter正常投票
-
         if change {
-            // // 投票转移
-            // // 更新投票信息
-            // msg.vcd.poll_from.push(VFrom::new(myid, poll));
-            // // 更新自身的投票去向
-            // sga.poll_to = Some(VTo::new(msg.vcd.myid, poll));
-            // log::debug!(
-            //     "[{}] - [{}] - Voting change actively, change votes {} to voter {}",
-            //     sga.vcd.myid,
-            //     msg.vcd.myid,
-            //     poll,
-            //     msg.vcd.myid
-            // );
-
-            // // 投票确认
-            // msg.vcd.poll += sga.vcd.poll;
-            // // 自身投票清空
-            // sga.vcd.poll = 0;
-            // // 全部票数投出去了，本节点已经变成投票人了(非候选人)
-            // sga.released = true;
-            // msg.result = VoteResult::CHANGE;
             msg.result = VoteResult::Change;
         } else {
             // 投票确认
@@ -460,17 +415,8 @@ impl Handler<Vote> for ChatServer {
             msg.vcd.poll_from.push(vfrom);
 
             msg.result = VoteResult::Ok;
-
-            // 选举leader
-            // self.electing_header();
         }
 
-        // log::debug!(
-        //     "[{}] - [{}] - Server Vote: SGA: {:?}",
-        //     sga.vcd.myid,
-        //     msg.vcd.myid,
-        //     sga.clone()
-        // );
         cvar.notify_one();
 
         return MessageResult(msg);

@@ -21,10 +21,6 @@ port = 6969
 
 # data_root = "./ayisha/"
 # worker = 2
-namespaces = [
-    "default",
-    "buildin",
-]
 
 # sqlite = "./.ayisha/defaults/123/ayisha.db"
 
@@ -73,13 +69,56 @@ app_secret = "fadf8748-35ac-4193-baea-4b5fd2edd722"
 # 连接失败重试等待时间
 connect_retry = 10
 
-namespace = "default"
-
 
 ##############################################################################
 [heartbeat]
 interval = 10
 timeout = 30
+
+
+[guard_common]
+# 基础目录
+#guard_root = "/data/dataxone/sync"
+# 工作目录, Service_Name, 目录不存在，则忽略，考虑多个节点部署的情况
+# abs_work_dir = $data_root/$work_dir => /data/dataxone/sync/ora2kafka/ds_ora2kafka
+root = [
+    { src = "/data/dataxone/sync/ds1", dst = "/data/dataxone/sync/dt1" },
+    { src = "/data/dataxone/sync/ora2kafka/ds_ora2kafka", dst = "/data/dataxone/sync/ora2kafka/dy_ora2kafka", ext = "/data/dataxone/sync/ora2kafka/dt_ora2kafka" },
+]
+# 静态目录，首次连接同步，同步原理：两边先计算
+# abs_work_static_dir = $data_root/$work_dir/$work_static_dir => /data/dataxone/sync/ora2kafka/ds_ora2kafka/bin
+dirs = ["bin", "config", "scripts", "elib"]
+
+# 动态变化文件，准实时同步
+vars = ["rmp", "vcfsa", "dict", "debug"]
+
+[[guard]]
+[[guard.src]]
+root = "/data/dataxone/sync/ds1"
+dirs = ["bin", "config", "scripts", "elib"]
+vars = ["rmp", "vcfsa", "dict", "debug"]
+
+# [[guard.dst]]
+# root = "/data/dataxone/sync/dt1"
+# static = ["bin", "config", "scripts", "elib"]
+# var = ["rmp"]
+
+# [[guard]]
+# [[guard.src]]
+# root = "/data/dataxone/sync/ora2kafka/ds_ora2kafka"
+# static = ["bin", "config", "scripts", "elib"]
+# var = ["rmp", "vcfsa", "dict", "debug"]
+
+# [[guard.dst]]
+# root = "/data/dataxone/sync/ora2kafka/dy_ora2kafka"
+# static = ["bin", "config", "scripts", "elib"]
+# var = ["rmp"]
+
+# [[guard.ext]]
+# root = "/data/dataxone/sync/ora2kafka/dt_ora2kafka"
+# static = ["bin", "lib", "./start.sh"]
+# var = []
+
 
 
 ##############################################################################
