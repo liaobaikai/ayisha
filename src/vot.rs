@@ -152,24 +152,24 @@ impl VoteHandler {
                             // log::debug!("[{myid}] - [{server_id}] - Voter.SGA:tick: {:?}", sga);
                             // 如果已经放弃候选人的角色，则后续无需参与投票
                             if sga.released {
-                                log::debug!("[{myid}] - [{server_id}] - Changing event, current status is abandon, sleep for {:?} to continue", INTERVAL);
+                                log::debug!("[{myid}] - [{server_id}] - Changing event, current status is abandon, wait {:?} for next", INTERVAL);
                                 continue;
                             }
 
                             // 投票来源谁？无需重复投票
                             if sga.is_poll_from(&server_id) {
-                                log::debug!("[{myid}] - [{server_id}] - Changing event, Voted from {server_id}, sleep for {:?} to continue", INTERVAL);
+                                log::debug!("[{myid}] - [{server_id}] - Changing event, Voted from {server_id}, wait {:?} for next", INTERVAL);
                                 continue;
                             }
                             // 我投票给谁？无需重复投票
                             if sga.is_poll_to(&server_id) {
-                                log::debug!("[{myid}] - [{server_id}] - Changing event, Voted to {server_id}, sleep for {:?} to continue", INTERVAL);
+                                log::debug!("[{myid}] - [{server_id}] - Changing event, Voted to {server_id}, wait {:?} for next", INTERVAL);
                                 continue;
                             }
 
                             // 投票转移, 已经投票过,且投票失败
                             if sga.get_vcd().poll_changed.contains(&server_id) {
-                                log::debug!("[{myid}] - [{server_id}] - Changed Vote, sleep for {:?} to continue", INTERVAL);
+                                log::debug!("[{myid}] - [{server_id}] - Changed Vote, wait {:?} for next", INTERVAL);
                                 continue;
                             }
 
@@ -201,7 +201,7 @@ impl VoteHandler {
                             log::error!("[{myid}] - [{server_id}] - TX send failed, cause: {e}");
                             break;
                         } else {
-                            log::debug!("[{myid}] - [{server_id}] - TX sent, sleep for {:?} to continue", INTERVAL);
+                            log::debug!("[{myid}] - [{server_id}] - TX sent, wait {:?} for next", INTERVAL);
                         }
                     }
                 }
@@ -233,7 +233,7 @@ impl VoteHandler {
                 if sga.is_leader(server_id) {
                     // 重置，开始投票
                     sga.reset_with_vote();
-                    log::debug!("[{myid}] - [{server_id}] - Leader offline, Start voting leader");
+                    log::debug!("[{myid}] - [{server_id}] - Leader offline, start voting leader");
                 }
                 cvar.notify_one();
                 token.cancel();

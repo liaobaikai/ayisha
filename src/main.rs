@@ -105,9 +105,9 @@ async fn main() -> std::io::Result<()> {
                         )
                         .await;
                     if connect_failed {
-                        log::info!("[{}] - [{}] - Connection not established, wait for {} seconds to retry again", myid, server.id, config::get_client_connect_retry());
+                        log::info!("[{}] - [{}] - Connection not established, wait {}s for retry again", myid, server.id, config::get_client_connect_retry());
                     } else {
-                        log::info!("[{}] - [{}] - The connection has been disconnected, wait for {} seconds to reconnect", myid, server.id, config::get_client_connect_retry());
+                        log::info!("[{}] - [{}] - The connection has been disconnected, wait {}s for reconnect", myid, server.id, config::get_client_connect_retry());
                     }
                     tokio::time::sleep(Duration::from_secs(
                         config::get_client_connect_retry() as u64
