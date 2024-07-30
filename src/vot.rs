@@ -84,11 +84,10 @@ impl VoteHandler {
                             ws::WsEvent::Follower => {
                                 // leader reset
                                 log::info!("[{}] - [{}] - to Follower", &myid, &server_id);
-                                let mut sga = lock.lock();
+                                // let mut sga = lock.lock();
                                 // 降级为Follower
-                                sga.to_following();
-                                // 清除连接失败
-                                sga.hb_failed.clear();
+                                // sga.to_following();
+                                
                             }
                             ws::WsEvent::Vote => {
                                 // 投票
@@ -131,14 +130,17 @@ impl VoteHandler {
                                     if !sga.is_not_looking() {
                                         // 同步数据
                                         sga.sync_leader(vcd.leader, vcd.term, shared::Status::Following);
-                                        log::debug!("[{myid}] - [{server_id}] - RECV Leader Broadcast, ga = {}", sga.fmt());
+                                        // 通知其他等待的线程
+                                        cvar.notify_one();
+                                        log::debug!("[{myid}] - [{server_id}] - Recv Leader Broadcast, ga = {}", sga.fmt());
                                     }
                                 }
                             }
 
                             // 心跳完成
                             ws::WsEvent::Heartbeat => {
-                                log::debug!("[{}] - [{}] - Heartbeat Ok", &myid, &server_id);
+                                let sga = lock.lock();
+                                log::debug!("[{}] - [{}] - {:?} Heartbeat Ok", &myid, &server_id, sga.role);
                             }
 
                             _ => { }
@@ -204,7 +206,6 @@ impl VoteHandler {
                         let src = WsRequest{
                             event: event.clone(),
                             vcd: sga.get_vcd(),
-                            hb_failed_count: sga.hb_failed.len()
                         }.to_bytestr();
 
                         if let Err(e) = tx.send(src) {
@@ -247,7 +248,8 @@ impl VoteHandler {
                     log::debug!("[{myid}] - [{server_id}] - Leader offline, start voting leader");
                 } else {
                     // 连接失败
-                    sga.hb_failed.insert(server_id, myid);
+                    // 该节点不活跃
+                    sga.active_nodes.remove(&server_id);
                 }
                 cvar.notify_one();
                 token.cancel();

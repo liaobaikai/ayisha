@@ -49,6 +49,9 @@ pub struct WsChatSession {
     pub closed: bool,
 
     pub ip: IpAddr,
+
+    // RSA加密
+    pub id_rsa: (String, String)
 }
 
 impl WsChatSession {
@@ -130,7 +133,12 @@ impl Actor for WsChatSession {
             .into_actor(self)
             .then(|res, act, ctx| {
                 match res {
-                    Ok(res) => act.session_id = res,
+                    Ok(res) => {
+                        act.session_id = res;
+                        // act.id_rsa = 
+                        // 回写加密
+                        ctx.text("abc");
+                    },
                     // something is wrong with chat server
                     _ => ctx.stop(),
                 }
@@ -274,7 +282,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                         let data = server::Heartbeat {
                             session_id: self.session_id,
                             vcd: v.vcd.clone(),
-                            hb_failed_count: v.hb_failed_count,
                             result: server::HbResult::Undefined
                         };
 

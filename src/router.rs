@@ -57,6 +57,7 @@ async fn chat_route(
             addr: srv.get_ref().clone(),
             closed: false,
             ip,
+            id_rsa: ("".to_owned(), "".to_owned())
         },
         &req,
         stream,

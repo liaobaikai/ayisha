@@ -10,20 +10,7 @@ pub struct WsRequest {
     // json数据
     pub vcd: VCData,
 
-    // 连接失败的数量，如果超过半数，则需要降级
-    pub hb_failed_count: usize,
 }
-
-// #[derive(Debug, Clone, Deserialize, Serialize)]
-// pub struct Profile {
-
-//     // 事件
-//     pub event: WsEvent,
-
-//     // json数据
-//     pub attr: Attribute
-
-// }
 
 impl WsRequest {
     pub fn from_str<'a>(s: &'a str) -> Result<Self, serde_json::Error> {
@@ -86,7 +73,7 @@ pub enum WsEvent {
     Follower,
     // leader下线
     LeaderOffline,
-    // leader下线
+    // 普通节点下线
     Offline,
     // 节点内部通讯
     Heartbeat,

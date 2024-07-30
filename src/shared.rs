@@ -27,10 +27,12 @@ pub struct GlobalArea {
     pub released: bool,
     // 状态：启动后默认
     pub status: Status,
+    // 角色
+    pub role: Role,
     // 如果leader选举一直等不到过半的节点存活，则超过这个时间，就退出，避免脑裂
     pub discovery_wait_timeout: Duration,
-    // 连接失败的节点
-    pub hb_failed: HashMap<usize, usize>,
+    // 集群内活跃的节点数
+    pub active_nodes: HashMap<usize, usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -40,6 +42,12 @@ pub enum Status {
     Leading,
 }
 
+#[derive(Debug, Clone)]
+pub enum Role {
+    Follower,
+    Leader,
+}
+
 impl GlobalArea {
     pub fn new() -> Self {
         GlobalArea {
@@ -47,27 +55,21 @@ impl GlobalArea {
             poll_to: None,
             released: false,
             status: Status::Looking,
+            role: Role:: Follower,
             discovery_wait_timeout: Duration::seconds(
                 config::get_server_discovery_wait_timeout() as i64
             ),
-            hb_failed: HashMap::new()
+            active_nodes: HashMap::new()
         }
     }
 
-    /// 重置
+    // 重置
     pub fn reset_with_vote(&mut self) {
         self.vcd.reset_with_vote();
         self.poll_to = None;
         self.released = false;
         self.status = Status::Looking;
-    }
-
-    /// 降级为following
-    pub fn to_following(&mut self) {
-        self.vcd.reset_with_vote();
-        self.poll_to = None;
-        self.released = false;
-        self.status = Status::Looking;
+        self.role = Role::Follower;
     }
 
     pub fn poll_from(&mut self, v: VFrom) -> usize {
@@ -109,6 +111,10 @@ impl GlobalArea {
     pub fn sync_leader(&mut self, leader: usize, term: usize, status: Status) {
         self.vcd.sync_leader(leader, term);
         self.status = status;
+        self.role = match self.status {
+            Status::Leading => Role::Leader,
+            _ => Role::Follower,
+        };
     }
 
     pub fn is_leader(&self, id: usize) -> bool {
