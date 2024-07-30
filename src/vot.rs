@@ -6,8 +6,7 @@ use crate::{
 use awc::ws::{Frame, Message};
 use bytestring::ByteString;
 use futures_util::{SinkExt as _, StreamExt as _};
-use parking_lot::Mutex;
-use std::{collections::HashMap, time::{Duration, Instant}};
+use std::time::{Duration, Instant};
 use tokio::{
     select,
     sync::mpsc::{self},
@@ -150,7 +149,7 @@ impl VoteHandler {
 
                         // 没有票数的时候，就等待
                         let mut sga = lock.lock();
-                        
+
                         // 没有leader
                         if !sga.is_not_looking() {
 
@@ -223,7 +222,7 @@ impl VoteHandler {
             "ws://{}:{}/im/chat/{}/{}",
             self.addr, self.port, server_id, myid
         );
-        
+
         let (_resp, mut ws) = match awc::Client::new()
             .ws(&url)
             .header(servlet::imguard::HEADER_APP_KEY, app_key)
@@ -238,7 +237,7 @@ impl VoteHandler {
                     self.addr,
                     self.port
                 );
-                
+
                 // 如果连接失败的是leader
                 let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
                 let mut sga = lock.lock();
@@ -261,8 +260,6 @@ impl VoteHandler {
             self.addr,
             self.port
         );
-
-        
 
         // 连接成功
         // let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();

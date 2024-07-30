@@ -1,6 +1,6 @@
 use crate::{
     config,
-    shared::{self, Status, VCData, VFrom},
+    shared::{self, VCData, VFrom},
     ws::{WsEvent, WsResponse},
 };
 use actix::prelude::*;

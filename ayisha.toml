@@ -76,7 +76,7 @@ interval = 10
 timeout = 30
 
 
-[guard_common]
+[watcher]
 # 基础目录
 #guard_root = "/data/dataxone/sync"
 # 工作目录, Service_Name, 目录不存在，则忽略，考虑多个节点部署的情况

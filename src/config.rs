@@ -8,29 +8,28 @@ use std::{fs::File, io};
 use structopt::StructOpt;
 
 lazy_static! {
-    pub static ref APP_CONFIG: AppConfig = get_appconfig();
-    // pub static ref DB_CONN: Connection = get_db_connection();
+    pub static ref APP_CONFIG: Config = get_config();
 }
 
 pub static DEFAULT_PORT: u16 = 6969;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppConfig {
+pub struct Config {
     // 服务端
-    pub server: Option<AppConfigServer>,
+    pub server: Option<ConfigServer>,
     // 客户端
-    pub client: Option<AppConfigClient>,
+    pub client: Option<ConfigClient>,
     // 心跳信息
-    pub heartbeat: Option<AppConfigHeartbeat>,
+    pub heartbeat: Option<ConfigHeartbeat>,
     // 集群服务节点
-    pub node: Option<Vec<AppConfigNode>>,
+    pub node: Option<Vec<ConfigNode>>,
     //
-    pub guard_common: Option<AppGuardCommon>,
-    pub guard: Option<Vec<AppGuard>>,
+    pub watcher: Option<ConfigWatcher>,
+    // pub guard: Option<Vec<AppGuard>>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppConfigServer {
+pub struct ConfigServer {
     // ID：默认为1
     pub server_id: Option<usize>,
     // 启动端口：默认为6969
@@ -46,7 +45,7 @@ pub struct AppConfigServer {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppConfigClient {
+pub struct ConfigClient {
     // 是否跟随server启动，默认为false
     pub singleton: Option<bool>,
     // APP_KEY
@@ -58,9 +57,9 @@ pub struct AppConfigClient {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppGuardCommon {
+pub struct ConfigWatcher {
     // 基础目录
-    pub root: Vec<AppGuardCommonItem>,
+    pub root: Vec<ConfigWatchItem>,
     // 目录
     pub dirs: Vec<String>,
     // 变化的文件、路径
@@ -68,35 +67,17 @@ pub struct AppGuardCommon {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppGuardCommonItem {
+pub struct ConfigWatchItem {
     // 源
-    pub src: String,
+    pub src: Option<String>,
     // 目标
-    pub dst: String,
+    pub dst: Option<String>,
+    // 扩展
     pub ext: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppGuard {
-    // 源
-    pub src: AppGuardItem,
-    // 目标
-    pub dst: AppGuardItem,
-    pub ext: Option<AppGuardItem>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppGuardItem {
-    // 基础目录
-    pub root: String,
-    // 目录
-    pub dirs: Option<Vec<String>>,
-    // 变化的文件、路径
-    pub vars: Option<Vec<String>>,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppConfigHeartbeat {
+pub struct ConfigHeartbeat {
     // 心跳间隔，秒
     pub interval: Option<usize>,
     // 心跳超时，秒
@@ -104,7 +85,7 @@ pub struct AppConfigHeartbeat {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct AppConfigNode {
+pub struct ConfigNode {
     // ID，默认为1
     pub id: usize,
     // 服务节点，默认127.0.0.1
@@ -124,18 +105,17 @@ pub struct Ident {
     pub user: String,
     pub app_key: String,
     pub app_secret: String,
-    pub namespace: String,
 }
 
 impl HostBasedAuth {
     pub fn new() -> Self {
-        let path = "./hba_ident.toml";
+        let opt = Opt::from_args();
 
-        let toml_text = fs::read_to_string(path).unwrap();
+        let toml_text = fs::read_to_string(&opt.hba_ident_file).unwrap();
         let hba: HostBasedAuth = match toml::from_str(&toml_text) {
             Ok(p) => p,
             Err(e) => {
-                panic!("<ParseTOML> File {} cannot be parsed, CAUSE:\n{}", path, e);
+                panic!("<ParseTOML> File {} cannot be parsed, cause:\n{}", &opt.hba_ident_file, e);
             }
         };
         hba
@@ -165,6 +145,9 @@ pub struct Opt {
 
     #[structopt(short="-i", long, parse(try_from_str=parse_file_path))]
     pub defaults_file: String,
+
+    #[structopt(long, parse(try_from_str=parse_file_path))]
+    pub hba_ident_file: String,
 }
 
 // SERVER
@@ -172,7 +155,7 @@ pub fn get_server_id() -> usize {
     APP_CONFIG
         .server
         .clone()
-        .and_then(|s: AppConfigServer| s.server_id)
+        .and_then(|s: ConfigServer| s.server_id)
         .unwrap_or(1)
 }
 
@@ -180,7 +163,7 @@ pub fn get_server_port() -> u16 {
     APP_CONFIG
         .server
         .clone()
-        .and_then(|s: AppConfigServer| s.port)
+        .and_then(|s: ConfigServer| s.port)
         .unwrap_or(DEFAULT_PORT)
 }
 
@@ -188,7 +171,7 @@ pub fn get_server_worker() -> usize {
     APP_CONFIG
         .server
         .clone()
-        .and_then(|s: AppConfigServer| s.worker)
+        .and_then(|s: ConfigServer| s.worker)
         .unwrap_or(2)
 }
 
@@ -196,7 +179,7 @@ pub fn get_server_discovery_wait_timeout() -> usize {
     APP_CONFIG
         .server
         .clone()
-        .and_then(|s: AppConfigServer| s.discovery_wait_timeout)
+        .and_then(|s: ConfigServer| s.discovery_wait_timeout)
         .unwrap_or(60)
 }
 
@@ -204,7 +187,7 @@ pub fn get_server_weight() -> usize {
     APP_CONFIG
         .server
         .clone()
-        .and_then(|s: AppConfigServer| s.weight)
+        .and_then(|s: ConfigServer| s.weight)
         .unwrap_or(1)
 }
 
@@ -214,7 +197,7 @@ pub fn get_server_data_root() -> PathBuf {
     let data_root = APP_CONFIG
         .server
         .clone()
-        .and_then(|s: AppConfigServer| s.data_root)
+        .and_then(|s: ConfigServer| s.data_root)
         .unwrap_or(default_data_root.display().to_string());
 
     let path = Path::new(&data_root).to_path_buf();
@@ -228,7 +211,7 @@ pub fn get_server_root() -> PathBuf {
     path
 }
 
-pub fn get_nodes() -> Vec<AppConfigNode> {
+pub fn get_nodes() -> Vec<ConfigNode> {
     let nodes = APP_CONFIG.node.clone().unwrap_or(Vec::new());
     if nodes.len() < 3 {
         panic!("[[node]] At least 3 nodes");
@@ -269,15 +252,15 @@ pub fn get_client_connect_retry() -> usize {
         .unwrap_or(60)
 }
 
-pub fn get_appconfig() -> AppConfig {
+pub fn get_config() -> Config {
     let opt = Opt::from_args();
 
     let toml_text = fs::read_to_string(opt.defaults_file.clone()).unwrap();
-    let config: AppConfig = match toml::from_str(&toml_text) {
+    let config: Config = match toml::from_str(&toml_text) {
         Ok(p) => p,
         Err(e) => {
             panic!(
-                "<ParseTOML> File {} cannot be parsed, CAUSE:\n{}",
+                "<ParseTOML> File {} cannot be parsed, cause:\n{}",
                 opt.defaults_file, e
             );
         }

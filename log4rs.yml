@@ -9,11 +9,11 @@ appenders:
       pattern: "{d(%m %d %H:%M:%S)} {l:>5.5} {({M}):20.20}: {m}{n}"
 
   # An appender named "requests" that writes to a file with a custom pattern encoder
-  requests:
-    kind: file
-    path: "logs/requests.log"
-    encoder:
-      pattern: "{d(%m %d %H:%M:%S)} {l:>5.5} {({M}):20.20}: {m}{n}"
+  # requests:
+  #   kind: file
+  #   path: "../logs/requests.log"
+  #   encoder:
+  #     pattern: "{d(%m %d %H:%M:%S)} {l:>5.5} {({M}):20.20}: {m}{n}"
 
 # Set the default logging level to "warn" and attach the "stdout" appender to the root
 root:
