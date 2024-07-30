@@ -8,7 +8,7 @@ use std::{fs::File, io};
 use structopt::StructOpt;
 
 lazy_static! {
-    pub static ref APP_CONFIG: Config = get_config();
+    pub static ref CONFIG: Config = get_config();
 }
 
 pub static DEFAULT_PORT: u16 = 6969;
@@ -115,7 +115,10 @@ impl HostBasedAuth {
         let hba: HostBasedAuth = match toml::from_str(&toml_text) {
             Ok(p) => p,
             Err(e) => {
-                panic!("<ParseTOML> File {} cannot be parsed, cause:\n{}", &opt.hba_ident_file, e);
+                panic!(
+                    "<ParseTOML> File {} cannot be parsed, cause:\n{}",
+                    &opt.hba_ident_file, e
+                );
             }
         };
         hba
@@ -152,7 +155,7 @@ pub struct Opt {
 
 // SERVER
 pub fn get_server_id() -> usize {
-    APP_CONFIG
+    CONFIG
         .server
         .clone()
         .and_then(|s: ConfigServer| s.server_id)
@@ -160,7 +163,7 @@ pub fn get_server_id() -> usize {
 }
 
 pub fn get_server_port() -> u16 {
-    APP_CONFIG
+    CONFIG
         .server
         .clone()
         .and_then(|s: ConfigServer| s.port)
@@ -168,7 +171,7 @@ pub fn get_server_port() -> u16 {
 }
 
 pub fn get_server_worker() -> usize {
-    APP_CONFIG
+    CONFIG
         .server
         .clone()
         .and_then(|s: ConfigServer| s.worker)
@@ -176,7 +179,7 @@ pub fn get_server_worker() -> usize {
 }
 
 pub fn get_server_discovery_wait_timeout() -> usize {
-    APP_CONFIG
+    CONFIG
         .server
         .clone()
         .and_then(|s: ConfigServer| s.discovery_wait_timeout)
@@ -184,7 +187,7 @@ pub fn get_server_discovery_wait_timeout() -> usize {
 }
 
 pub fn get_server_weight() -> usize {
-    APP_CONFIG
+    CONFIG
         .server
         .clone()
         .and_then(|s: ConfigServer| s.weight)
@@ -194,7 +197,7 @@ pub fn get_server_weight() -> usize {
 pub fn get_server_data_root() -> PathBuf {
     let pwd = env::current_dir().unwrap();
     let default_data_root = pwd.join(format!(".{}", env!("CARGO_PKG_NAME")));
-    let data_root = APP_CONFIG
+    let data_root = CONFIG
         .server
         .clone()
         .and_then(|s: ConfigServer| s.data_root)
@@ -212,7 +215,7 @@ pub fn get_server_root() -> PathBuf {
 }
 
 pub fn get_nodes() -> Vec<ConfigNode> {
-    let nodes = APP_CONFIG.node.clone().unwrap_or(Vec::new());
+    let nodes = CONFIG.node.clone().unwrap_or(Vec::new());
     if nodes.len() < 3 {
         panic!("[[node]] At least 3 nodes");
     }
@@ -221,7 +224,7 @@ pub fn get_nodes() -> Vec<ConfigNode> {
 
 // CLIENT
 pub fn get_client_singleton() -> bool {
-    APP_CONFIG
+    CONFIG
         .client
         .clone()
         .and_then(|c| c.singleton)
@@ -229,7 +232,7 @@ pub fn get_client_singleton() -> bool {
 }
 
 pub fn get_client_app_key() -> String {
-    APP_CONFIG
+    CONFIG
         .client
         .clone()
         .and_then(|c| c.app_key)
@@ -237,7 +240,7 @@ pub fn get_client_app_key() -> String {
 }
 
 pub fn get_client_app_secret() -> String {
-    APP_CONFIG
+    CONFIG
         .client
         .clone()
         .and_then(|c| c.app_secret)
@@ -245,7 +248,7 @@ pub fn get_client_app_secret() -> String {
 }
 
 pub fn get_client_connect_retry() -> usize {
-    APP_CONFIG
+    CONFIG
         .client
         .clone()
         .and_then(|c| c.connect_retry)
