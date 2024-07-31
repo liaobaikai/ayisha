@@ -137,7 +137,7 @@ impl Actor for WsChatSession {
                         act.session_id = res;
                         // act.id_rsa = 
                         // 回写加密
-                        ctx.text("abc");
+                        // ctx.text("abc");
                     },
                     // something is wrong with chat server
                     _ => ctx.stop(),
@@ -308,7 +308,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsChatSession {
                                         server::HbResult::Follower => {
                                             // leader降级
                                             ctx.text(
-                                                WsResponse::ok(WsEvent::Follower, "to Follower OK".to_owned(), None)
+                                                WsResponse::ok(WsEvent::Follower, "To-Follower OK".to_owned(), None)
                                                     .to_string(),
                                             );
                                         },

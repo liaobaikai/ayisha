@@ -1,6 +1,6 @@
 use crate::{
     config,
-    shared::{self, VCData, VFrom},
+    shared::{self, VCData, VFrom, NON_LEADER},
     ws::{WsEvent, WsResponse},
 };
 use actix::prelude::*;
@@ -134,6 +134,10 @@ pub struct ChatServer {
     session_keys: HashMap<usize, usize>,
     // 连接失败数统计，超过3次，则降级
     hb_failed_count: usize,
+    // leader 下线的次数统计
+    lost_leader_count: usize,
+    // leader 是否已经加入
+    leader_online: bool,
 }
 
 impl ChatServer {
@@ -145,6 +149,8 @@ impl ChatServer {
             vote_from: HashMap::new(),
             session_keys: HashMap::new(),
             hb_failed_count: 0,
+            lost_leader_count: 0,
+            leader_online: false,
         }
     }
 }
@@ -251,6 +257,8 @@ impl ChatServer {
     ) {
         sga.reset_with_vote();
         self.vote_from.clear();
+        self.lost_leader_count = 0;
+        self.hb_failed_count = 0;
     }
 }
 
@@ -328,18 +336,19 @@ impl Handler<Heartbeat> for ChatServer {
     fn handle(&mut self, mut msg: Heartbeat, _: &mut Context<Self>) -> Self::Result {
         let &(ref lock, ref cvar) = &*shared::SHARE_GLOBAL_AREA_MUTEX_PAIR.clone();
         let sga = lock.lock();
-        // log::debug!(
-        //     "{:?}:::::::active_nodes: {:?}",
-        //     sga.status,
-        //     sga.active_nodes
-        // );
+        let myid = sga.vcd.myid;
+        
+        log::debug!("[{}] - [{}] - {:?} {:?}, current active nodes: {:?}", myid, myid, sga.role, sga.status, sga.active_nodes);
+        
+        // 是否需要降级为follower
+        let mut reset = false;
         match sga.status {
             shared::Status::Looking => {
                 let msg = self.electing_leader(sga, msg);
                 cvar.notify_one();
                 return MessageResult(msg);
             }
-            shared::Status::Leading | shared::Status::Following => {
+            shared::Status::Leading => {
                 // 只有自己也会有 1
                 let active_node_count = sga.active_nodes.len();
                 // 总节点数: 3
@@ -356,17 +365,63 @@ impl Handler<Heartbeat> for ChatServer {
                     self.hb_failed_count += 1;
                     if self.hb_failed_count >= 3 {
                         // 降级为 follower
-                        msg.result = HbResult::Follower;
-                        self.to_follower_with_looking(sga);
-
-                        cvar.notify_one();
-                        return MessageResult(msg);
+                        reset = true;
                     }
+                }
+            }
+
+            shared::Status::Following => {
+
+                // 是否已经包含了 leader
+                if self.leader_online && !sga.active_nodes.contains_key(&msg.vcd.leader) {
+                    self.lost_leader_count += 1;
+                    log::debug!("[{}] - [{}] - Loss leader count: {:?}", myid, myid, self.lost_leader_count);
+                    if self.lost_leader_count >= 3 {
+                        reset = true;
+                    }
+
+                } else {
+
+                    // 只有自己也会有 1
+                    let active_node_count = sga.active_nodes.len();
+                    // 总节点数: 3
+                    let node_count = config::get_nodes().len();
+                    // 最小存活节点
+                    let expect_min_active_count = if node_count % 2 == 1 {
+                        (node_count + 1) / 2
+                    } else {
+                        node_count / 2
+                    };
+                    // 活跃节点数少于过半，3 个节点为 2 个，5 个节点为 3 个
+                    if active_node_count < expect_min_active_count {
+                        // 且>= 3 次
+                        self.hb_failed_count += 1;
+                        log::debug!("[{}] - [{}] - Heartbeat failed count: {:?}", myid, myid, self.hb_failed_count);
+                        if self.hb_failed_count >= 3 {
+                            // 降级为 follower
+                            reset = true;
+                        }
+                    }
+
                 }
             }
         }
 
+        if reset {
+            msg.result = HbResult::Follower;
+            self.to_follower_with_looking(sga);
+
+            log::debug!("[{}] - [{}] - Broadcast to other session", myid, myid);
+
+            cvar.notify_one();
+            return MessageResult(msg);
+        }
+
         msg.result = HbResult::Ok;
+
+        if msg.vcd.leader != NON_LEADER {
+            self.leader_online = true;
+        }
 
         cvar.notify_one();
         return MessageResult(msg);
@@ -385,7 +440,9 @@ impl Handler<Vote> for ChatServer {
         let mut sga = lock.lock();
 
         // 有状态则不用选举
-        if sga.is_not_looking() {
+        // 判断 leader 是否在线
+        if sga.is_not_looking() && sga.active_nodes.contains_key(&msg.vcd.leader)  {
+            // leader 在线
             msg.result = VoteResult::Leader;
             log::debug!("[{}] - [{}] - Join At Follower", sga.vcd.myid, msg.vcd.myid);
             // 同步给投票人

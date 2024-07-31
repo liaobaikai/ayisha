@@ -83,7 +83,7 @@ impl VoteHandler {
                             }
                             ws::WsEvent::Follower => {
                                 // leader reset
-                                log::info!("[{}] - [{}] - to Follower", &myid, &server_id);
+                                log::info!("[{}] - [{}] - Leader to follower", &myid, &server_id);
                                 // let mut sga = lock.lock();
                                 // 降级为Follower
                                 // sga.to_following();
